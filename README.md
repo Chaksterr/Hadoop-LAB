@@ -176,11 +176,3 @@ vagrant ssh master -c "sudo -u hadoop tail -100 /home/hadoop/hadoop/logs/hadoop-
 # Verify JournalNodes are running
 vagrant ssh master -c "sudo -u hadoop jps | grep JournalNode"
 ```
-
-## License
-
-MIT
-
-## Author
-
-Built with ❤️ for learning Hadoop HA clusters
