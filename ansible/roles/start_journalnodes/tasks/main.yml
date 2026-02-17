@@ -1,0 +1,29 @@
+---
+# Start JournalNodes before NameNode formatting
+
+- name: Check if JournalNode is running
+  shell: "sudo -u {{ hadoop_user }} jps | grep -q JournalNode"
+  register: jn_running
+  failed_when: false
+  changed_when: false
+  tags: journalnode
+
+- name: Start JournalNode
+  shell: "sudo -u {{ hadoop_user }} {{ hadoop_home }}/bin/hdfs --daemon start journalnode"
+  when: jn_running.rc != 0
+  tags: journalnode
+
+- name: Wait for JournalNode to start
+  wait_for:
+    port: "{{ journalnode_rpc_port }}"
+    host: 127.0.0.1
+    delay: 3
+    timeout: 30
+  when: jn_running.rc != 0
+  tags: journalnode
+
+- name: Display JournalNode already running
+  debug:
+    msg: "JournalNode already running on {{ inventory_hostname }}"
+  when: jn_running.rc == 0
+  tags: journalnode

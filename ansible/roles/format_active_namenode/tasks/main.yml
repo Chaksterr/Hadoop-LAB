@@ -1,0 +1,70 @@
+---
+# Format Active NameNode (master) - ONLY ONCE
+
+- name: Check if active NameNode already formatted
+  stat:
+    path: "{{ hadoop_data_dir }}/namenode/current/VERSION"
+  register: namenode_formatted
+  tags: format
+
+- name: Format active NameNode with cluster ID
+  shell: "sudo -u {{ hadoop_user }} {{ hadoop_home }}/bin/hdfs namenode -format -clusterId {{ nameservice_id }} -force -nonInteractive"
+  when: not namenode_formatted.stat.exists
+  tags: format
+
+- name: Check if JournalNodes are initialized
+  stat:
+    path: "{{ hadoop_data_dir }}/journalnode/{{ nameservice_id }}/current/VERSION"
+  register: journalnode_initialized
+  delegate_to: "{{ groups['journalnodes'][0] }}"
+  tags: format
+
+- name: Initialize shared edits directories in JournalNodes
+  shell: "sudo -u {{ hadoop_user }} {{ hadoop_home }}/bin/hdfs namenode -initializeSharedEdits -force -nonInteractive"
+  when: not journalnode_initialized.stat.exists
+  tags: format
+
+- name: Display formatting result
+  debug:
+    msg: "Active NameNode formatted and JournalNodes initialized successfully"
+  when: not namenode_formatted.stat.exists or not journalnode_initialized.stat.exists
+  tags: format
+
+- name: Skip formatting if already done
+  debug:
+    msg: "Active NameNode already formatted, skipping..."
+  when: namenode_formatted.stat.exists
+  tags: format
+
+- name: Check if NameNode is running
+  shell: "sudo -u {{ hadoop_user }} jps | grep -w NameNode"
+  register: nn_running
+  failed_when: false
+  changed_when: false
+  tags: start
+
+- name: Start active NameNode
+  shell: "sudo -u {{ hadoop_user }} {{ hadoop_home }}/bin/hdfs --daemon start namenode"
+  when: nn_running.rc != 0
+  tags: start
+
+- name: Wait for active NameNode to start
+  wait_for:
+    host: 0.0.0.0
+    port: 8020
+    delay: 10
+    timeout: 120
+  when: nn_running.rc != 0
+  tags: start
+
+- name: Additional wait for full initialization
+  pause:
+    seconds: 15
+  when: nn_running.rc != 0
+  tags: start
+
+- name: Display NameNode already running
+  debug:
+    msg: "Active NameNode already running on {{ inventory_hostname }}"
+  when: nn_running.rc == 0
+  tags: start

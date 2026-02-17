@@ -1,0 +1,53 @@
+---
+# Bootstrap Standby NameNode from Active NameNode
+
+- name: Check if standby NameNode already bootstrapped
+  stat:
+    path: "{{ hadoop_data_dir }}/namenode/current/VERSION"
+  register: standby_formatted
+  tags: bootstrap
+
+- name: Bootstrap standby NameNode from active
+  shell: "sudo -u {{ hadoop_user }} {{ hadoop_home }}/bin/hdfs namenode -bootstrapStandby -nonInteractive"
+  when: not standby_formatted.stat.exists
+  tags: bootstrap
+  register: bootstrap_result
+
+- name: Display bootstrap result
+  debug:
+    msg: "Standby NameNode bootstrapped successfully"
+  when: not standby_formatted.stat.exists
+  tags: bootstrap
+
+- name: Skip bootstrap if already done
+  debug:
+    msg: "Standby NameNode already bootstrapped, skipping..."
+  when: standby_formatted.stat.exists
+  tags: bootstrap
+
+- name: Check if NameNode is running
+  shell: "sudo -u {{ hadoop_user }} jps | grep -w NameNode"
+  register: nn_running
+  failed_when: false
+  changed_when: false
+  tags: start
+
+- name: Start standby NameNode
+  shell: "sudo -u {{ hadoop_user }} {{ hadoop_home }}/bin/hdfs --daemon start namenode"
+  when: nn_running.rc != 0
+  tags: start
+
+- name: Wait for standby NameNode to start
+  wait_for:
+    host: 0.0.0.0
+    port: 8020
+    delay: 5
+    timeout: 60
+  when: nn_running.rc != 0
+  tags: start
+
+- name: Display NameNode already running
+  debug:
+    msg: "Standby NameNode already running on {{ inventory_hostname }}"
+  when: nn_running.rc == 0
+  tags: start

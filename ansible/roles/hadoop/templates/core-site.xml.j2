@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+
+<configuration>
+    <!-- NameService URI (not specific NameNode) -->
+    <property>
+        <name>fs.defaultFS</name>
+        <value>hdfs://{{ nameservice_id }}</value>
+        <description>The default nameservice for HDFS HA cluster</description>
+    </property>
+    
+    <property>
+        <name>hadoop.tmp.dir</name>
+        <value>/tmp/hadoop-${user.name}</value>
+    </property>
+    
+    <!-- ZooKeeper configuration for automatic failover -->
+    <property>
+        <name>ha.zookeeper.quorum</name>
+        <value>master:{{ zookeeper_client_port }},standby:{{ zookeeper_client_port }},datanode1:{{ zookeeper_client_port }}</value>
+        <description>ZooKeeper ensemble for HA coordination</description>
+    </property>
+</configuration>

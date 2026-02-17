@@ -1,0 +1,23 @@
+---
+
+- name: Verify ZooKeeper is running
+  shell: "sudo -u {{ hadoop_user }} {{ zookeeper_home }}/bin/zkServer.sh status"
+  register: zk_status
+  failed_when: false
+  changed_when: false
+  when: inventory_hostname in groups['zookeepers']
+
+- name: Display ZooKeeper status
+  debug:
+    msg: "ZooKeeper is running on {{ inventory_hostname }}"
+  when: 
+    - inventory_hostname in groups['zookeepers']
+    - zk_status.rc == 0
+
+- name: Start HDFS HA services
+  import_tasks: start_hdfs_ha.yml
+  tags: [init, hdfs]
+
+- name: Start YARN services
+  import_tasks: start_yarn.yml
+  tags: [init, yarn]

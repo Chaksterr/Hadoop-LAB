@@ -1,0 +1,127 @@
+---
+
+# =============================================
+# STEP 1: Start ZooKeeper Ensemble FIRST
+# =============================================
+- name: Start ZooKeeper ensemble
+  hosts: zookeepers
+  become: yes
+  tasks:
+    - name: Check if ZooKeeper is running
+      shell: "sudo -u {{ hadoop_user }} jps | grep -q QuorumPeerMain"
+      register: zk_running
+      failed_when: false
+      changed_when: false
+
+    - name: Start ZooKeeper
+      shell: "sudo -u {{ hadoop_user }} {{ zookeeper_home }}/bin/zkServer.sh start"
+      when: zk_running.rc != 0
+
+    - name: Wait for ZooKeeper to start
+      wait_for:
+        host: 0.0.0.0
+        port: 2181
+        delay: 3
+        timeout: 30
+      when: zk_running.rc != 0
+
+    - name: Display ZooKeeper status
+      debug:
+        msg: "ZooKeeper started on {{ inventory_hostname }}"
+      when: zk_running.rc != 0
+
+# =============================================
+# STEP 2: Start JournalNodes
+# =============================================
+- name: Start JournalNodes
+  hosts: journalnodes
+  become: yes
+  tasks:
+    - name: Check if JournalNode is running
+      shell: "sudo -u {{ hadoop_user }} jps | grep -q JournalNode"
+      register: jn_running
+      failed_when: false
+      changed_when: false
+
+    - name: Start JournalNode
+      shell: "sudo -u {{ hadoop_user }} {{ hadoop_home }}/bin/hdfs --daemon start journalnode"
+      when: jn_running.rc != 0
+
+    - name: Wait for JournalNode to start
+      wait_for:
+        port: 8485
+        host: 0.0.0.0
+        delay: 3
+        timeout: 30
+      when: jn_running.rc != 0
+
+    - name: Display JournalNode status
+      debug:
+        msg: "JournalNode started on {{ inventory_hostname }}"
+      when: jn_running.rc != 0
+
+# =============================================
+# STEP 3: Start NameNodes (Active first, then Standby)
+# =============================================
+- name: Start Active NameNode on master
+  hosts: master
+  become: yes
+  tasks:
+    - name: Check if NameNode is running
+      shell: "sudo -u {{ hadoop_user }} jps | grep -q NameNode"
+      register: nn_running
+      failed_when: false
+      changed_when: false
+
+    - name: Start Active NameNode
+      shell: "sudo -u {{ hadoop_user }} {{ hadoop_home }}/bin/hdfs --daemon start namenode"
+      when: nn_running.rc != 0
+
+    - name: Wait for Active NameNode to start
+      wait_for:
+        port: 9870
+        host: 0.0.0.0
+        delay: 5
+        timeout: 60
+      when: nn_running.rc != 0
+
+    - name: Display Active NameNode status
+      debug:
+        msg: "Active NameNode started on master"
+      when: nn_running.rc != 0
+
+- name: Start Standby NameNode
+  hosts: standby
+  become: yes
+  tasks:
+    - name: Check if NameNode is running
+      shell: "sudo -u {{ hadoop_user }} jps | grep -q NameNode"
+      register: nn_running
+      failed_when: false
+      changed_when: false
+
+    - name: Start Standby NameNode
+      shell: "sudo -u {{ hadoop_user }} {{ hadoop_home }}/bin/hdfs --daemon start namenode"
+      when: nn_running.rc != 0
+
+    - name: Wait for Standby NameNode to start
+      wait_for:
+        port: 9870
+        host: 0.0.0.0
+        delay: 5
+        timeout: 60
+      when: nn_running.rc != 0
+
+    - name: Display Standby NameNode status
+      debug:
+        msg: "Standby NameNode started on standby"
+      when: nn_running.rc != 0
+
+# =============================================
+# STEP 4 & 5: Start HDFS services using initialization role
+# =============================================
+- name: Start HDFS HA and YARN services
+  hosts: all
+  become: yes
+  roles:
+    - initialization

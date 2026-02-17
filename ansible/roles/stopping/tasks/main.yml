@@ -1,0 +1,13 @@
+---
+
+- name: Stop YARN services
+  import_tasks: stop_yarn.yml
+  tags: [stop, yarn]
+
+- name: Stop HDFS HA services
+  import_tasks: stop_hdfs_ha.yml
+  tags: [stop, hdfs]
+
+- name: Stop ZooKeeper cluster
+  import_tasks: stop_zookeeper.yml
+  tags: [stop, zookeeper]

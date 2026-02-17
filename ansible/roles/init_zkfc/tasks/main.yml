@@ -1,0 +1,28 @@
+---
+# Initialize ZooKeeper for automatic failover (ONLY ONCE)
+
+- name: Check if ZKFC already initialized in ZooKeeper
+  shell: "echo 'ls /hadoop-ha' | sudo -u {{ hadoop_user }} {{ zookeeper_home }}/bin/zkCli.sh -server localhost:2181 2>&1 | grep -q '\\[{{ nameservice_id }}\\]'"
+  register: zkfc_check
+  failed_when: false
+  changed_when: false
+  timeout: 10
+  tags: zkfc
+
+- name: Format ZooKeeper for ZKFC
+  shell: "sudo -u {{ hadoop_user }} {{ hadoop_home }}/bin/hdfs zkfc -formatZK -force -nonInteractive"
+  when: zkfc_check.rc != 0
+  timeout: 30
+  tags: zkfc
+
+- name: ZKFC initialization complete
+  debug:
+    msg: "ZooKeeper formatted for automatic failover"
+  when: zkfc_check.rc != 0
+  tags: zkfc
+
+- name: ZKFC already initialized
+  debug:
+    msg: "ZooKeeper already initialized for ZKFC, skipping..."
+  when: zkfc_check.rc == 0
+  tags: zkfc

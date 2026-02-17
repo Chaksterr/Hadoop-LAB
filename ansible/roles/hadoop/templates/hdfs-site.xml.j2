@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+
+<configuration>    
+    <!-- Replication factor -->
+    <property>
+        <name>dfs.replication</name>
+        <value>2</value>
+    </property>
+    
+    <!-- NameNode directory (both active and standby) -->
+    <property>
+        <name>dfs.namenode.name.dir</name>
+        <value>file://{{ hadoop_data_dir }}/namenode</value>
+    </property>
+    
+    <!-- DataNode directory -->
+    <property>
+        <name>dfs.datanode.data.dir</name>
+        <value>file://{{ hadoop_data_dir }}/datanode</value>
+    </property>
+        
+    <!-- Nameservice ID -->
+    <property>
+        <name>dfs.nameservices</name>
+        <value>{{ nameservice_id }}</value>
+        <description>Logical name for this nameservice</description>
+    </property>
+    
+    <!-- NameNode IDs within the nameservice -->
+    <property>
+        <name>dfs.ha.namenodes.{{ nameservice_id }}</name>
+        <value>{{ namenode1_id }},{{ namenode2_id }}</value>
+        <description>Unique identifiers for each NameNode</description>
+    </property>
+    
+
+    
+    <property>
+        <name>dfs.namenode.rpc-address.{{ nameservice_id }}.{{ namenode1_id }}</name>
+        <value>{{ namenode1_host }}:{{ namenode1_rpc_port }}</value>
+        <description>Active NameNode RPC address</description>
+    </property>
+    
+    <property>
+        <name>dfs.namenode.rpc-address.{{ nameservice_id }}.{{ namenode2_id }}</name>
+        <value>{{ namenode2_host }}:{{ namenode2_rpc_port }}</value>
+        <description>Standby NameNode RPC address</description>
+    </property>
+    
+    
+    <property>
+        <name>dfs.namenode.http-address.{{ nameservice_id }}.{{ namenode1_id }}</name>
+        <value>{{ namenode1_host }}:{{ namenode1_http_port }}</value>
+        <description>Active NameNode Web UI address</description>
+    </property>
+    
+    <property>
+        <name>dfs.namenode.http-address.{{ nameservice_id }}.{{ namenode2_id }}</name>
+        <value>{{ namenode2_host }}:{{ namenode2_http_port }}</value>
+        <description>Standby NameNode Web UI address</description>
+    </property>
+    
+
+    
+    <!-- Shared storage using QJM (Quorum Journal Manager) -->
+    <property>
+        <name>dfs.namenode.shared.edits.dir</name>
+        <value>qjournal://master:{{ journalnode_rpc_port }};standby:{{ journalnode_rpc_port }};datanode1:{{ journalnode_rpc_port }}/{{ nameservice_id }}</value>
+        <description>URI of journal nodes for shared edit log storage</description>
+    </property>
+    
+    <!-- JournalNode local storage directory -->
+    <property>
+        <name>dfs.journalnode.edits.dir</name>
+        <value>{{ journalnode_edits_dir }}</value>
+        <description>Local directory for journal node edits</description>
+    </property>
+    
+
+    
+    <!-- Client failover proxy provider -->
+    <property>
+        <name>dfs.client.failover.proxy.provider.{{ nameservice_id }}</name>
+        <value>org.apache.hadoop.hdfs.server.namenode.ha.ConfiguredFailoverProxyProvider</value>
+        <description>Java class for client-side failover</description>
+    </property>
+    
+    <!-- Automatic failover enabled -->
+    <property>
+        <name>dfs.ha.automatic-failover.enabled</name>
+        <value>true</value>
+        <description>Enable automatic failover using ZooKeeper</description>
+    </property>
+    
+
+    
+    <!-- Fencing method (prevents split-brain) -->
+    <property>
+        <name>dfs.ha.fencing.methods</name>
+sudo -u hadoop /home/hadoop/hadoop/bin/hdfs --daemon stop namenode
+        <value>shell(/bin/true)</value>
+        <description>Fencing method - using shell command for simplicity</description>
+    </property>
+    
+    <!-- SSH private key for fencing (backup method) -->
+    <property>
+        <name>dfs.ha.fencing.ssh.private-key-files</name>
+        <value>/home/{{ hadoop_user }}/.ssh/id_rsa</value>
+        <description>SSH key for passwordless access during fencing</description>
+    </property>
+    
+    
+    <!-- NameNode bind addresses (0.0.0.0 for external access) -->
+    <property>
+        <name>dfs.namenode.rpc-bind-host</name>
+        <value>0.0.0.0</value>
+    </property>
+    <property>
+        <name>dfs.namenode.servicerpc-bind-host</name>
+        <value>0.0.0.0</value>
+    </property>
+    <property>
+        <name>dfs.namenode.http-bind-host</name>
+        <value>0.0.0.0</value>
+    </property>
+    <property>
+        <name>dfs.namenode.https-bind-host</name>
+        <value>0.0.0.0</value>
+    </property>
+    
+    <!-- DataNode bind address -->
+    <property>
+        <name>dfs.datanode.ipc-bind-host</name>
+        <value>0.0.0.0</value>
+    </property>
+    
+    <!-- JournalNode bind addresses -->
+    <property>
+        <name>dfs.journalnode.rpc-bind-host</name>
+        <value>0.0.0.0</value>
+    </property>
+    <property>
+        <name>dfs.journalnode.http-bind-host</name>
+        <value>0.0.0.0</value>
+    </property>
+    <property>
+        <name>dfs.journalnode.https-bind-host</name>
+        <value>0.0.0.0</value>
+    </property>
+</configuration>

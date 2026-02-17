@@ -1,0 +1,108 @@
+---
+# Stop HDFS HA services (reverse order)
+
+# =============================================
+# STEP 1: Stop DataNodes first
+# =============================================
+
+- name: Check if DataNode is running
+  shell: "sudo -u {{ hadoop_user }} jps | grep -q DataNode"
+  register: dn_running
+  failed_when: false
+  changed_when: false
+  when: inventory_hostname in groups['datanodes']
+
+- name: Stop DataNode service
+  shell: "sudo -u {{ hadoop_user }} {{ hadoop_home }}/bin/hdfs --daemon stop datanode"
+  when:
+    - inventory_hostname in groups['datanodes']
+    - dn_running.rc == 0
+
+- name: Wait for DataNodes to stop
+  pause:
+    seconds: 5
+  when: inventory_hostname in groups['datanodes']
+
+# =============================================
+# STEP 2: Stop ZKFC (ZooKeeper Failover Controllers)
+# =============================================
+
+- name: Check if ZKFC is running
+  shell: "sudo -u {{ hadoop_user }} jps | grep -q DFSZKFailoverController"
+  register: zkfc_running
+  failed_when: false
+  changed_when: false
+  when: inventory_hostname in groups['namenodes']
+
+- name: Stop ZKFC service
+  shell: "sudo -u {{ hadoop_user }} {{ hadoop_home }}/bin/hdfs --daemon stop zkfc"
+  when:
+    - inventory_hostname in groups['namenodes']
+    - zkfc_running.rc == 0
+
+- name: Wait for ZKFC to stop
+  pause:
+    seconds: 3
+  when: inventory_hostname in groups['namenodes']
+
+# =============================================
+# STEP 3: Stop NameNodes (standby first, then active)
+# =============================================
+
+- name: Check if NameNode is running on standby
+  shell: "sudo -u {{ hadoop_user }} jps | grep -q NameNode"
+  register: standby_nn_running
+  failed_when: false
+  changed_when: false
+  when: inventory_hostname == 'standby'
+
+- name: Stop Standby NameNode
+  shell: "sudo -u {{ hadoop_user }} {{ hadoop_home }}/bin/hdfs --daemon stop namenode"
+  when:
+    - inventory_hostname == 'standby'
+    - standby_nn_running.rc == 0
+
+- name: Wait for standby NameNode to stop
+  pause:
+    seconds: 5
+  when: inventory_hostname == 'standby'
+
+- name: Check if NameNode is running on master
+  shell: "sudo -u {{ hadoop_user }} jps | grep -q NameNode"
+  register: active_nn_running
+  failed_when: false
+  changed_when: false
+  when: inventory_hostname == 'master'
+
+- name: Stop Active NameNode
+  shell: "sudo -u {{ hadoop_user }} {{ hadoop_home }}/bin/hdfs --daemon stop namenode"
+  when:
+    - inventory_hostname == 'master'
+    - active_nn_running.rc == 0
+
+- name: Wait for active NameNode to stop
+  pause:
+    seconds: 5
+  when: inventory_hostname == 'master'
+
+# =============================================
+# STEP 4: Stop JournalNodes last
+# =============================================
+
+- name: Check if JournalNode is running
+  shell: "sudo -u {{ hadoop_user }} jps | grep -q JournalNode"
+  register: jn_running
+  failed_when: false
+  changed_when: false
+  when: inventory_hostname in groups['journalnodes']
+
+- name: Stop JournalNode service
+  shell: "sudo -u {{ hadoop_user }} {{ hadoop_home }}/bin/hdfs --daemon stop journalnode"
+  when:
+    - inventory_hostname in groups['journalnodes']
+    - jn_running.rc == 0
+
+- name: Display HDFS HA services stopped
+  debug:
+    msg: "All HDFS HA services stopped successfully"
+  run_once: true

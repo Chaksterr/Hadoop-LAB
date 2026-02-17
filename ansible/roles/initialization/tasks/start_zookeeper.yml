@@ -1,0 +1,42 @@
+---
+# Start ZooKeeper servers (3.8.5)
+
+- name: Check if ZooKeeper is running
+  shell: "sudo -u {{ hadoop_user }} {{ zookeeper_home }}/bin/zkServer.sh status 2>&1"
+  register: zk_running
+  failed_when: false
+  changed_when: false
+  when: inventory_hostname in groups['zookeepers']
+
+- name: Stop ZooKeeper if already running
+  shell: "sudo -u {{ hadoop_user }} {{ zookeeper_home }}/bin/zkServer.sh stop"
+  when:
+    - inventory_hostname in groups['zookeepers']
+    - "'running' in zk_running.stdout or 'follower' in zk_running.stdout or 'leader' in zk_running.stdout"
+
+- name: Wait for ZooKeeper to stop
+  pause:
+    seconds: 3
+  when: inventory_hostname in groups['zookeepers']
+
+- name: Start ZooKeeper
+  shell: "sudo -u {{ hadoop_user }} {{ zookeeper_home }}/bin/zkServer.sh start"
+  when: inventory_hostname in groups['zookeepers']
+
+- name: Wait for ZooKeeper to start
+  wait_for:
+    port: "{{ zookeeper_client_port }}"
+    host: 127.0.0.1
+    delay: 5
+    timeout: 30
+  when: inventory_hostname in groups['zookeepers']
+
+- name: Verify ZooKeeper status
+  shell: "sudo -u {{ hadoop_user }} {{ zookeeper_home }}/bin/zkServer.sh status"
+  register: zk_status
+  when: inventory_hostname in groups['zookeepers']
+
+- name: Display ZooKeeper status
+  debug:
+    msg: "{{ zk_status.stdout_lines }}"
+  when: inventory_hostname in groups['zookeepers']

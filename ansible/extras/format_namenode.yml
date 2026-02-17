@@ -1,0 +1,9 @@
+---
+# Format NameNode playbook - Run only when needed
+# Usage: ansible-playbook -i inventory.ini extras/format_namenode.yml
+
+- name: Format master NameNode
+  hosts: master
+  become: yes
+  roles:
+    - format_master

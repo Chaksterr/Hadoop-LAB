@@ -1,0 +1,51 @@
+---
+# Start Active NameNode (required before bootstrapping standby)
+
+- name: Check if active NameNode is already running
+  shell: "sudo -u {{ hadoop_user }} jps | grep -w NameNode"
+  register: namenode_running
+  failed_when: false
+  changed_when: false
+  tags: start_active
+
+- name: Stop NameNode if running (to ensure clean start)
+  shell: "sudo -u {{ hadoop_user }} {{ hadoop_home }}/bin/hdfs --daemon stop namenode"
+  when: namenode_running.rc == 0
+  tags: start_active
+
+- name: Wait for NameNode to fully stop
+  wait_for:
+    port: 8020
+    state: stopped
+    timeout: 30
+  when: namenode_running.rc == 0
+  tags: start_active
+
+- name: Start active NameNode
+  shell: "sudo -u {{ hadoop_user }} {{ hadoop_home }}/bin/hdfs --daemon start namenode"
+  tags: start_active
+
+- name: Wait for active NameNode RPC port to be available
+  wait_for:
+    host: 0.0.0.0
+    port: 8020
+    delay: 10
+    timeout: 120
+  tags: start_active
+
+- name: Additional wait for NameNode to fully initialize
+  pause:
+    seconds: 15
+  tags: start_active
+
+- name: Verify NameNode is running
+  shell: "sudo -u {{ hadoop_user }} jps | grep -w NameNode"
+  register: namenode_verify
+  failed_when: namenode_verify.rc != 0
+  changed_when: false
+  tags: start_active
+
+- name: Display active NameNode status
+  debug:
+    msg: "Active NameNode started and verified successfully on port 8020"
+  tags: start_active
