@@ -1,0 +1,103 @@
+---
+# roles/hive/tasks/main.yml
+# Install and configure Apache Hive with MySQL metastore
+
+- name: Download Hive {{ hive_version }} tarball
+  get_url:
+    url: "{{ hive_mirror }}"
+    dest: "/tmp/apache-hive-{{ hive_version }}-bin.tar.gz"
+    timeout: 300
+
+- name: Extract Hive tarball
+  unarchive:
+    src: "/tmp/apache-hive-{{ hive_version }}-bin.tar.gz"
+    dest: "/home/hadoop/"
+    remote_src: yes
+    owner: hadoop
+    group: hadoop
+    creates: "/home/hadoop/apache-hive-{{ hive_version }}-bin"
+
+- name: Create Hive symlink
+  file:
+    src: "/home/hadoop/apache-hive-{{ hive_version }}-bin"
+    dest: "{{ hive_home }}"
+    state: link
+    owner: hadoop
+    group: hadoop
+    force: yes
+
+- name: Download MySQL Connector/J JAR directly into Hive lib
+  get_url:
+    url: "{{ mysql_connector_url }}"
+    dest: "{{ hive_home }}/lib/mysql-connector-j-{{ mysql_connector_version }}.jar"
+    timeout: 300
+    owner: hadoop
+    group: hadoop
+    mode: "0644"
+
+- name: Ensure Hive lib directory has correct ownership
+  file:
+    path: "{{ hive_home }}/lib"
+    owner: hadoop
+    group: hadoop
+    recurse: yes
+    state: directory
+
+- name: Remove old Guava JAR from Hive lib
+  shell: "rm -f {{ hive_home }}/lib/guava-*.jar"
+  become_user: hadoop
+  args:
+    removes: "{{ hive_home }}/lib/guava-19.0.jar"
+
+- name: Copy Hadoop's Guava JAR to Hive lib
+  shell: "cp {{ hadoop_home }}/share/hadoop/common/lib/guava-*.jar {{ hive_home }}/lib/"
+  become_user: hadoop
+  args:
+    creates: "{{ hive_home }}/lib/.guava_fixed"
+
+- name: Mark Guava fix as completed
+  file:
+    path: "{{ hive_home }}/lib/.guava_fixed"
+    state: touch
+    owner: hadoop
+    group: hadoop
+
+- name: Create hive-site.xml from template
+  template:
+    src: hive-site.xml.j2
+    dest: "{{ hive_home }}/conf/hive-site.xml"
+    owner: hadoop
+    group: hadoop
+    mode: '0644'
+
+- name: Add Hive environment variables to hadoop user profile
+  blockinfile:
+    path: /home/hadoop/.bashrc
+    marker: "# {mark} HIVE ENVIRONMENT"
+    block: |
+      export HIVE_HOME={{ hive_home }}
+      export PATH=$PATH:$HIVE_HOME/bin
+    create: yes
+    owner: hadoop
+    group: hadoop
+
+- name: Initialize Hive metastore schema
+  shell: |
+    {{ hive_home }}/bin/schematool -dbType mysql -initSchema
+  args:
+    chdir: "{{ hadoop_install_dir }}"
+    creates: "{{ hive_home }}/.schema_initialized"
+  become_user: hadoop
+  environment:
+    HIVE_HOME: "{{ hive_home }}"
+    HADOOP_HOME: "{{ hadoop_home }}"
+  register: schema_init
+  ignore_errors: yes
+
+- name: Mark schema initialization as completed
+  file:
+    path: "{{ hive_home }}/.schema_initialized"
+    state: touch
+    owner: hadoop
+    group: hadoop
+  when: schema_init is succeeded or schema_init is skipped

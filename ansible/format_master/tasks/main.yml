@@ -1,0 +1,13 @@
+---
+# roles/format_master/tasks/main.yml
+# Runs on master only, and only the first time.
+
+- name: Format the NameNode (first run only)
+  become: yes
+  become_user: "{{ hadoop_user }}"
+  environment:
+    JAVA_HOME: "/usr/lib/jvm/java-{{ java_version }}-openjdk-amd64"
+    HADOOP_HOME: "{{ hadoop_home }}"
+  shell: "{{ hadoop_home }}/bin/hdfs namenode -format -force"
+  args:
+    creates: "{{ hdfs_namenode_dir }}/current/VERSION"

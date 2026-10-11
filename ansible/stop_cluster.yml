@@ -1,0 +1,54 @@
+---
+# ansible/stop_cluster.yml
+# Run whenever you want to shut the cluster down cleanly
+# (e.g. before `vagrant halt`).
+#
+# Usage:
+#   cd ansible
+#   ansible-playbook stop_cluster.yml
+
+- name: Stop Hadoop cluster
+  hosts: master
+  become: yes
+  become_user: "{{ hadoop_user }}"
+  environment:
+    JAVA_HOME: "/usr/lib/jvm/java-{{ java_version }}-openjdk-amd64"
+    HADOOP_HOME: "{{ hadoop_home }}"
+    HADOOP_CONF_DIR: "{{ hadoop_home }}/etc/hadoop"
+  tasks:
+
+    - name: Stop HiveServer2
+      shell: "pkill -9 -f 'hive.*hiveserver2'"
+      ignore_errors: yes
+      failed_when: false
+
+    - name: Stop Hive Metastore
+      shell: "pkill -9 -f 'hive.*metastore'"
+      ignore_errors: yes
+      failed_when: false
+
+    - name: Stop JobHistory server
+      shell: "{{ hadoop_home }}/bin/mapred --daemon stop historyserver"
+      ignore_errors: yes
+
+    - name: Stop YARN (ResourceManager + NodeManagers)
+      shell: "{{ hadoop_home }}/sbin/stop-yarn.sh"
+      ignore_errors: yes
+
+    - name: Stop HDFS (NameNode + DataNodes)
+      shell: "{{ hadoop_home }}/sbin/stop-dfs.sh"
+      ignore_errors: yes
+
+- name: Check all nodes are stopped
+  hosts: hadoop_cluster
+  become: yes
+  become_user: "{{ hadoop_user }}"
+  tasks:
+
+    - name: Confirm nothing Hadoop-related is still running on {{ inventory_hostname }}
+      shell: "jps"
+      register: jps_out
+
+    - name: Print jps output for {{ inventory_hostname }} (should only show 'Jps' itself)
+      debug:
+        msg: "{{ inventory_hostname }}: {{ jps_out.stdout_lines }}"

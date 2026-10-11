@@ -1,0 +1,86 @@
+---
+# roles/common/tasks/main.yml
+# Runs on every node (master + datanodes).
+
+- name: Update apt cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Install OpenJDK {{ java_version }} and basic tools
+  apt:
+    name:
+      - "openjdk-{{ java_version }}-jdk"
+      - openssh-server
+      - rsync
+      - acl
+    state: present
+
+- name: Create hadoop group
+  group:
+    name: "{{ hadoop_user }}"
+    state: present
+
+- name: Create hadoop user
+  user:
+    name: "{{ hadoop_user }}"
+    group: "{{ hadoop_user }}"
+    shell: /bin/bash
+    create_home: yes
+    home: "{{ hadoop_install_dir }}"
+
+- name: Remove Vagrant's loopback mapping of this node's hostname
+  lineinfile:
+    path: /etc/hosts
+    regexp: '^127\.0\.[0-9]+\.[0-9]+\s+{{ inventory_hostname }}(\s|$)'
+    state: absent
+
+- name: Add all cluster nodes to /etc/hosts
+  lineinfile:
+    path: /etc/hosts
+    regexp: '\s{{ item }}$'
+    line: "{{ hostvars[item].ansible_host }} {{ item }}"
+    state: present
+  loop: "{{ groups['hadoop_cluster'] }}"
+
+- name: Ensure .ssh directory exists for hadoop user
+  file:
+    path: "{{ hadoop_install_dir }}/.ssh"
+    state: directory
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_user }}"
+    mode: "0700"
+
+- name: Generate SSH keypair for hadoop user (master only)
+  become_user: "{{ hadoop_user }}"
+  command: ssh-keygen -t rsa -b 4096 -f {{ hadoop_install_dir }}/.ssh/id_rsa -N ""
+  args:
+    creates: "{{ hadoop_install_dir }}/.ssh/id_rsa"
+  when: inventory_hostname == 'master'
+
+- name: Read master's public key
+  slurp:
+    src: "{{ hadoop_install_dir }}/.ssh/id_rsa.pub"
+  when: inventory_hostname == 'master'
+  register: master_pubkey_raw
+
+- name: Share master's public key with every host in the play
+  set_fact:
+    master_pubkey: "{{ hostvars['master'].master_pubkey_raw.content | b64decode }}"
+
+- name: Authorize master's key on every node (self + datanodes)
+  authorized_key:
+    user: "{{ hadoop_user }}"
+    key: "{{ master_pubkey }}"
+    state: present
+
+- name: Disable strict host key checking for hadoop user's own ssh client
+  copy:
+    dest: "{{ hadoop_install_dir }}/.ssh/config"
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_user }}"
+    mode: "0600"
+    content: |
+      Host *
+        StrictHostKeyChecking no
+        UserKnownHostsFile /dev/null

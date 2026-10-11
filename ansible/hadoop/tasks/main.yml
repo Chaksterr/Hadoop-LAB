@@ -1,0 +1,112 @@
+---
+# roles/hadoop/tasks/main.yml
+# Runs on every node (master + datanodes) — same binaries and config
+# everywhere; only which daemons get started differs, and that's decided
+# later in the "initialization" role.
+
+- name: Download Hadoop {{ hadoop_version }} tarball
+  get_url:
+    url: "{{ hadoop_mirror }}"
+    dest: "/tmp/hadoop-{{ hadoop_version }}.tar.gz"
+    timeout: 600
+  register: hadoop_dl
+  retries: 3
+  delay: 10
+  until: hadoop_dl is succeeded
+
+- name: Extract Hadoop
+  unarchive:
+    src: "/tmp/hadoop-{{ hadoop_version }}.tar.gz"
+    dest: "{{ hadoop_install_dir }}"
+    remote_src: yes
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_user }}"
+  args:
+    creates: "{{ hadoop_install_dir }}/hadoop-{{ hadoop_version }}"
+
+- name: Symlink hadoop_home
+  file:
+    src: "{{ hadoop_install_dir }}/hadoop-{{ hadoop_version }}"
+    dest: "{{ hadoop_home }}"
+    state: link
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_user }}"
+
+- name: Create Hadoop tmp directory
+  file:
+    path: "{{ hadoop_install_dir }}/tmp"
+    state: directory
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_user }}"
+    mode: "0755"
+
+- name: Create namenode data dir (master only)
+  file:
+    path: "{{ hdfs_namenode_dir }}"
+    state: directory
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_user }}"
+    mode: "0755"
+  when: inventory_hostname == 'master'
+
+- name: Create datanode data dir (datanodes only)
+  file:
+    path: "{{ hdfs_datanode_dir }}"
+    state: directory
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_user }}"
+    mode: "0755"
+  when: inventory_hostname in groups['datanodes']
+
+- name: Add Hadoop environment variables to hadoop user's .bashrc
+  blockinfile:
+    path: "{{ hadoop_install_dir }}/.bashrc"
+    marker: "# {mark} HADOOP ENV"
+    block: |
+      export JAVA_HOME=/usr/lib/jvm/java-{{ java_version }}-openjdk-amd64
+      export HADOOP_HOME={{ hadoop_home }}
+      export HADOOP_CONF_DIR=$HADOOP_HOME/etc/hadoop
+      export PATH=$PATH:$HADOOP_HOME/bin:$HADOOP_HOME/sbin
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_user }}"
+
+- name: Set JAVA_HOME inside hadoop-env.sh 
+  lineinfile:
+    path: "{{ hadoop_home }}/etc/hadoop/hadoop-env.sh"
+    regexp: '^export JAVA_HOME='
+    line: "export JAVA_HOME=/usr/lib/jvm/java-{{ java_version }}-openjdk-amd64"
+
+- name: Deploy core-site.xml
+  template:
+    src: core-site.xml.j2
+    dest: "{{ hadoop_home }}/etc/hadoop/core-site.xml"
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_user }}"
+
+- name: Deploy hdfs-site.xml
+  template:
+    src: hdfs-site.xml.j2
+    dest: "{{ hadoop_home }}/etc/hadoop/hdfs-site.xml"
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_user }}"
+
+- name: Deploy yarn-site.xml
+  template:
+    src: yarn-site.xml.j2
+    dest: "{{ hadoop_home }}/etc/hadoop/yarn-site.xml"
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_user }}"
+
+- name: Deploy mapred-site.xml
+  template:
+    src: mapred-site.xml.j2
+    dest: "{{ hadoop_home }}/etc/hadoop/mapred-site.xml"
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_user }}"
+
+- name: Deploy workers file 
+  template:
+    src: workers.j2
+    dest: "{{ hadoop_home }}/etc/hadoop/workers"
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_user }}"

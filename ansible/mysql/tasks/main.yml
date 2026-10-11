@@ -1,0 +1,55 @@
+---
+# roles/mysql/tasks/main.yml
+# Install MySQL and create Hive metastore database
+
+- name: Install MySQL server
+  apt:
+    name:
+      - mysql-server
+      - python3-pymysql
+    state: present
+    update_cache: yes
+
+- name: Start and enable MySQL service
+  systemd:
+    name: mysql
+    state: started
+    enabled: yes
+
+- name: Check if MySQL root password is already set
+  shell: mysqladmin -u root -p"{{ mysql_root_password }}" ping
+  register: mysql_root_pwd_check
+  ignore_errors: yes
+  changed_when: false
+  no_log: true
+
+- name: Set MySQL root password (first time only)
+  mysql_user:
+    name: root
+    password: "{{ mysql_root_password }}"
+    login_unix_socket: /var/run/mysqld/mysqld.sock
+    state: present
+  when: mysql_root_pwd_check.rc != 0
+
+- name: Create Hive metastore database
+  mysql_db:
+    name: "{{ hive_metastore_db }}"
+    state: present
+    login_user: root
+    login_password: "{{ mysql_root_password }}"
+
+- name: Create Hive metastore user
+  mysql_user:
+    name: "{{ hive_metastore_user }}"
+    password: "{{ hive_metastore_password }}"
+    priv: "{{ hive_metastore_db }}.*:ALL"
+    host: "%"
+    state: present
+    login_user: root
+    login_password: "{{ mysql_root_password }}"
+
+- name: Flush MySQL privileges
+  mysql_query:
+    login_user: root
+    login_password: "{{ mysql_root_password }}"
+    query: FLUSH PRIVILEGES
