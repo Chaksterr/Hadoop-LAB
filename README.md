@@ -1,19 +1,17 @@
-# Hadoop-Hive-LAB
+# Hadoop-IAC
 
-> Automated Hadoop 3.3.6 + Hive cluster deployment using Infrastructure as Code. Spin up a fully configured 3-node Hadoop cluster with HDFS, YARN, MapReduce, and Apache Hive in minutes using Vagrant and Ansible.
+> Automated Hadoop 3.3.6 cluster deployment using Infrastructure as Code. Spin up a fully configured 3-node Hadoop cluster with HDFS, YARN, and MapReduce in minutes using Vagrant and Ansible.
 
 ## Architecture
 
 ```
 Master (192.168.56.10)          DataNode1 (192.168.56.12)       DataNode2 (192.168.56.13)
 ├── NameNode                    ├── DataNode                    ├── DataNode
-├── ResourceManager             ├── NodeManager                 └── NodeManager
-├── JobHistoryServer            
-├── MySQL (Hive Metastore)
-└── Hive CLI
+├── ResourceManager             └── NodeManager                 └── NodeManager
+└── JobHistoryServer
 ```
 
-**Stack:** Hadoop 3.3.6 | Apache Hive 3.1.3 | MySQL 8.0 | Java 11 | Vagrant | Ansible
+**Stack:** Hadoop 3.3.6 | Java 11 | Vagrant | Ansible
 
 **Resources:** Master (3GB RAM, 2 CPUs) | DataNodes (2GB RAM, 1 CPU each)
 
@@ -28,7 +26,6 @@ vagrant up
 # Verify
 vagrant ssh master
 jps  # Should show: NameNode, ResourceManager, JobHistoryServer
-hive --version  # Verify Hive installation
 ```
 
 ### Web UIs
@@ -61,8 +58,6 @@ hive --version  # Verify Hive installation
 │   │   └── all.yml             # Configuration variables
 │   ├── common/                 # Java, users, SSH
 │   ├── hadoop/                 # Hadoop installation
-│   ├── hive/                   # Hive installation
-│   ├── mysql/                  # MySQL metastore setup
 │   └── format_master/          # NameNode formatting
 ```
 
@@ -96,7 +91,7 @@ ansible-playbook -i inventory.ini stop_cluster.yml
 # Check services
 jps
 
-# Start Hadoop services (on master)
+# Start services (on master)
 sudo -u hadoop /home/hadoop/hadoop/bin/hdfs --daemon start namenode
 sudo -u hadoop /home/hadoop/hadoop/bin/yarn --daemon start resourcemanager
 sudo -u hadoop /home/hadoop/hadoop/bin/mapred --daemon start historyserver
@@ -133,50 +128,6 @@ hdfs dfsadmin -report
 
 ---
 
-## Hive Usage
-
-### Starting Hive
-```bash
-# SSH to master
-vagrant ssh master
-
-# Start Hive CLI
-hive
-
-# Or use beeline (recommended)
-beeline -u jdbc:hive2://
-```
-
-### Basic Hive Commands
-```sql
--- Show databases
-SHOW DATABASES;
-
--- Create database
-CREATE DATABASE mydb;
-USE mydb;
-
--- Create table
-CREATE TABLE users (
-    id INT,
-    name STRING,
-    age INT
-) ROW FORMAT DELIMITED
-FIELDS TERMINATED BY ','
-STORED AS TEXTFILE;
-
--- Load data from HDFS
-LOAD DATA INPATH '/user/hadoop/input/users.csv' INTO TABLE users;
-
--- Query data
-SELECT * FROM users WHERE age > 25;
-
--- Show tables
-SHOW TABLES;
-```
-
----
-
 ## User Management
 
 ### Default Users
@@ -190,25 +141,18 @@ SHOW TABLES;
 Edit `ansible/group_vars/all.yml`:
 ```yaml
 hadoop_version: "3.3.6"
-hive_version: "3.1.3"
 java_version: "11"
 hadoop_home: "/home/hadoop/hadoop"
-hive_home: "/home/hadoop/hive"
 namenode_host: "master"
 namenode_port: "9000"
 ```
 
-### Hadoop Configuration Templates
-Located in `ansible/hadoop/templates/`:
+Configuration templates in `ansible/hadoop/templates/`:
 - `core-site.xml.j2`
 - `hdfs-site.xml.j2`
 - `yarn-site.xml.j2`
 - `mapred-site.xml.j2`
 - `workers.j2`
-
-### Hive Configuration Templates
-Located in `ansible/hive/templates/`:
-- `hive-site.xml.j2` - Metastore and database configuration
 
 ---
 
@@ -216,11 +160,8 @@ Located in `ansible/hive/templates/`:
 
 ### Services Not Starting
 ```bash
-# Check Hadoop logs
+# Check logs
 tail -f /home/hadoop/hadoop/logs/*.log
-
-# Check Hive logs
-tail -f /home/hadoop/hive/logs/*.log
 
 # Verify Java
 java -version
@@ -247,18 +188,6 @@ ping master
 ping datanode1
 ```
 
-### Hive Metastore Connection Issues
-```bash
-# Check MySQL service
-sudo systemctl status mysql
-
-# Test MySQL connection
-mysql -u hive -p hive_metastore
-
-# Verify Hive metastore schema
-mysql -u hive -p -e "USE hive_metastore; SHOW TABLES;"
-```
-
 ### Re-format NameNode (⚠️ Erases all data!)
 ```bash
 cd ansible
@@ -270,15 +199,3 @@ sudo -u hadoop /home/hadoop/hadoop/bin/hdfs namenode -format -force
 cd ansible
 ansible-playbook -i inventory.ini start_cluster.yml
 ```
-
----
-
-## What's Different from Basic Hadoop?
-
-This setup extends a standard Hadoop cluster with:
-- **Apache Hive** - SQL-like interface for Hadoop
-- **MySQL Metastore** - Persistent metadata storage for Hive
-- **Automated Hive Setup** - Pre-configured with metastore connection
-- **Beeline Support** - Modern Hive CLI interface
-
-Perfect for learning Hive and running SQL queries on Hadoop without manual configuration!

@@ -17,18 +17,6 @@
   roles:
     - format_master
 
-- name: Install MySQL server and create Hive metastore database
-  hosts: masters
-  become: yes
-  roles:
-    - mysql
-
-- name: Install and configure Apache Hive (master only)
-  hosts: masters
-  become: yes
-  roles:
-    - hive
-
 - import_playbook: start_cluster.yml
 
 # Cluster is now installed, configured, and formatted.
