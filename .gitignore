@@ -1,0 +1,86 @@
+# =============================================================================
+#  Hadoop Lab - .gitignore (same file on every branch)
+# =============================================================================
+
+# ---- SSH keys & certificates (never commit) ---------------------------------
+id_rsa*
+id_dsa*
+id_ecdsa*
+id_ed25519*
+*private_key*
+insecure_private_key
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.ppk
+known_hosts
+authorized_keys
+.ssh/
+
+# ---- Secrets & credentials --------------------------------------------------
+.env
+.env.*
+*.secret
+secrets/
+vault-password*
+.vault_pass*
+*.vault
+credentials*
+*.kdbx
+
+# ---- Vagrant (machine state: VM ids, local paths, generated keys) ----------
+.vagrant/
+*.box
+ubuntu-*-console.log
+
+# ---- Ansible ----------------------------------------------------------------
+*.retry
+.ansible/
+ansible/fact_cache/
+
+# ---- Logs -------------------------------------------------------------------
+*.log
+logs/
+
+# ---- Big downloads (re-download from archive.apache.org) --------------------
+*.tar.gz
+*.tgz
+*.tar
+*.zip
+*.deb
+*.rpm
+*.jar
+
+# ---- Local data (too big / generated) ---------------------------------------
+/*.csv
+/*.parquet
+hadoop_data/
+data/
+output/
+
+# ---- Python / Jupyter -------------------------------------------------------
+__pycache__/
+*.pyc
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# ---- Java build output ------------------------------------------------------
+*.class
+target/
+
+# ---- Editors / OS -----------------------------------------------------------
+.vscode/
+.idea/
+*.iml
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ---- Claude Code local files ------------------------------------------------
+.claude/settings.local.json
+.claude_*.sh

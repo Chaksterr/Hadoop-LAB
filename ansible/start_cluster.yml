@@ -58,6 +58,21 @@
         HIVE_HOME: "{{ hive_home }}"
         HADOOP_HOME: "{{ hadoop_home }}"
 
+    - name: Check whether HBase is installed
+      stat:
+        path: "{{ hbase_home }}/bin/start-hbase.sh"
+      register: hbase_installed
+
+    - name: Wait for HDFS to leave safe mode (HBase cannot write before that)
+      shell: "{{ hadoop_home }}/bin/hdfs dfsadmin -safemode wait"
+      when: hbase_installed.stat.exists
+
+    - name: Start HBase (ZooKeeper + HMaster + RegionServers)
+      shell: "{{ hbase_home }}/bin/start-hbase.sh"
+      environment:
+        HBASE_HOME: "{{ hbase_home }}"
+      when: hbase_installed.stat.exists
+
     - name: Wait for daemons to settle
       pause:
         seconds: 10

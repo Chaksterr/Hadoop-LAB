@@ -1,0 +1,48 @@
+HADOOP-LAB - MANUAL COMMANDS
+Run on master as hadoop:  vagrant ssh master  ->  sudo -iu hadoop
+
+
+START  (HDFS -> YARN -> Hive -> HBase)
+-----
+1. start-dfs.sh
+2. start-yarn.sh
+3. mapred --daemon start historyserver
+4. nohup ~/hive/bin/hive --service metastore > ~/hive-metastore.log 2>&1 &
+5. sleep 10
+6. nohup ~/hive/bin/hive --service hiveserver2 > ~/hiveserver2.log 2>&1 &
+7. hdfs dfsadmin -safemode wait
+8. start-hbase.sh
+
+
+STOP  (HBase -> Hive -> YARN -> HDFS)
+----
+1. hbase master stop --shutDownCluster      (not stop-hbase.sh, it hangs)
+2. jps                                      (repeat until HMaster is gone)
+3. hbase-daemon.sh stop zookeeper
+4. pkill -f 'org.apache.hive.service.server.HiveServer2'
+5. pkill -f 'hive.*metastore'
+6. mapred --daemon stop historyserver
+7. stop-yarn.sh
+8. stop-dfs.sh
+
+
+CHECK
+-----
+jps                                  master:   NameNode, ResourceManager, HMaster, HQuorumPeer ...
+ssh datanode1 jps                    datanode: DataNode, NodeManager, HRegionServer
+hdfs dfsadmin -safemode get          Safe mode is OFF
+echo status | hbase shell -n         1 active master, 2 servers
+
+
+WEB UIs
+-------
+HDFS        http://192.168.56.10:9870
+YARN        http://192.168.56.10:8088
+Hive        http://192.168.56.10:10002
+HBase       http://192.168.56.10:16010
+
+
+ANSIBLE  (from laptop, in ansible/)
+-------
+ansible-playbook -i inventory.ini start_cluster.yml
+ansible-playbook -i inventory.ini stop_cluster.yml

@@ -17,8 +17,77 @@
     HADOOP_CONF_DIR: "{{ hadoop_home }}/etc/hadoop"
   tasks:
 
+    # ---------------------------------------------------------------------
+    # HBase must stop BEFORE HDFS, otherwise data still in MemStore is lost.
+    #
+    # We do NOT use stop-hbase.sh: in HBase 2.5.12 its waitForProcessEnd looks
+    # for 'proc_stop-master-command' while the master runs as '-Dproc_master',
+    # so it never waits. It then stops ZooKeeper while the master is still
+    # shutting down -> the master can't set the "cluster down" flag in ZK,
+    # RegionServers never get the signal, and everything hangs.
+    # So: ZK up -> ask cluster to shut down -> wait for exit -> THEN stop ZK.
+    # ---------------------------------------------------------------------
+    - name: Check whether HBase is installed
+      stat:
+        path: "{{ hbase_home }}/bin/hbase"
+      register: hbase_installed
+
+    - name: Check whether an HMaster is running
+      shell: "pgrep -f -- '-Dproc_[m]aster'"   # [m] so it doesn't match this shell itself
+      register: hmaster_running
+      when: hbase_installed.stat.exists
+      failed_when: false
+      changed_when: false
+
+    - name: Make sure ZooKeeper is up (HBase needs it to shut down cleanly)
+      shell: "{{ hbase_home }}/bin/hbase-daemon.sh start zookeeper"
+      environment:
+        HBASE_HOME: "{{ hbase_home }}"
+      when: hbase_installed.stat.exists and hmaster_running.rc == 0
+      register: zk_start
+      changed_when: "'running zookeeper' in zk_start.stdout"
+
+    - name: Ask HBase to shut down the cluster (RegionServers flush + exit, then HMaster)
+      shell: "timeout 120 {{ hbase_home }}/bin/hbase master stop --shutDownCluster"
+      environment:
+        HBASE_HOME: "{{ hbase_home }}"
+      when: hbase_installed.stat.exists and hmaster_running.rc == 0
+      ignore_errors: yes
+
+    - name: Wait until HMaster and RegionServers have exited
+      shell: |
+        for i in $(seq 1 60); do
+          alive=0
+          for h in {{ groups['hadoop_cluster'] | join(' ') }}; do
+            ssh -q $h "$JAVA_HOME/bin/jps" | grep -qE 'HMaster|HRegionServer' && alive=1
+          done
+          [ $alive -eq 0 ] && exit 0
+          sleep 2
+        done
+        exit 1
+      register: hbase_wait
+      when: hbase_installed.stat.exists
+      failed_when: false
+      changed_when: false
+
+    - name: Force-stop leftover HBase daemons (SIGTERM, only if still alive after 2 min)
+      shell: |
+        for h in {{ groups['hadoop_cluster'] | join(' ') }}; do
+          ssh -q $h "pkill -TERM -f 'org.apache.hadoop.hbase.(master.HMaster|regionserver.HRegionServer|zookeeper.HQuorumPeer)'"
+        done
+        sleep 10
+      when: hbase_installed.stat.exists and hbase_wait.rc | default(0) != 0
+      ignore_errors: yes
+
+    - name: Stop ZooKeeper (last, after HMaster and RegionServers are gone)
+      shell: "{{ hbase_home }}/bin/hbase-daemon.sh stop zookeeper"
+      environment:
+        HBASE_HOME: "{{ hbase_home }}"
+      when: hbase_installed.stat.exists
+      ignore_errors: yes
+
     - name: Stop HiveServer2
-      shell: "pkill -9 -f 'hive.*hiveserver2'"
+      shell: "pkill -9 -f 'org.apache.hive.service.server.HiveServer2'"
       ignore_errors: yes
       failed_when: false
 

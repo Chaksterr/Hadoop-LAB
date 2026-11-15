@@ -34,3 +34,7 @@ mysql_connector_url: "https://repo1.maven.org/maven2/com/mysql/mysql-connector-j
 hive_metastore_host: "master"
 hive_metastore_port: 9083
 hiveserver2_port: 10000
+
+# HBase configuration
+hbase_version: "2.5.12"
+hbase_home: "{{ hadoop_install_dir }}/hbase"
