@@ -1,0 +1,108 @@
+---
+# Start HDFS HA services (simplified - NameNodes already running)
+
+# =============================================
+# STEP 1: Verify NameNodes are running
+# =============================================
+
+- name: Check NameNode status
+  shell: "sudo -u {{ hadoop_user }} jps | grep -q NameNode"
+  register: nn_check
+  failed_when: false
+  changed_when: false
+  when: inventory_hostname in groups['namenodes']
+
+- name: Display NameNode status
+  debug:
+    msg: "NameNode already running on {{ inventory_hostname }}"
+  when: 
+    - inventory_hostname in groups['namenodes']
+    - nn_check.rc == 0
+
+# =============================================
+# STEP 2: Start ZKFC (ZooKeeper Failover Controllers)
+# Start master's ZKFC first to ensure it becomes active
+# =============================================
+
+- name: Check if ZKFC is running
+  shell: "sudo -u {{ hadoop_user }} jps | grep -q DFSZKFailoverController"
+  register: zkfc_running
+  failed_when: false
+  changed_when: false
+  when: inventory_hostname in groups['namenodes']
+
+- name: Stop ZKFC if already running
+  shell: "sudo -u {{ hadoop_user }} {{ hadoop_home }}/bin/hdfs --daemon stop zkfc"
+  when:
+    - inventory_hostname in groups['namenodes']
+    - zkfc_running.rc == 0
+
+- name: Wait after stopping ZKFC
+  pause:
+    seconds: 3
+  when:
+    - inventory_hostname in groups['namenodes']
+    - zkfc_running.rc == 0
+
+- name: Start ZKFC on active (master) first
+  shell: "sudo -u {{ hadoop_user }} {{ hadoop_home }}/bin/hdfs --daemon start zkfc"
+  when: inventory_hostname == groups['active_namenode'][0]
+
+- name: Wait for master ZKFC to elect active
+  pause:
+    seconds: 10
+  when: inventory_hostname == groups['active_namenode'][0]
+
+- name: Start ZKFC on standby
+  shell: "sudo -u {{ hadoop_user }} {{ hadoop_home }}/bin/hdfs --daemon start zkfc"
+  when: inventory_hostname == groups['standby_namenode'][0]
+
+- name: Wait for standby ZKFC to start
+  pause:
+    seconds: 5
+  when: inventory_hostname == groups['standby_namenode'][0]
+
+- name: Display ZKFC started
+  debug:
+    msg: "ZKFailoverController started on {{ inventory_hostname }}"
+  when: inventory_hostname in groups['namenodes']
+
+# =============================================
+# STEP 3: Start DataNodes
+# =============================================
+
+- name: Check if DataNode is running
+  shell: "sudo -u {{ hadoop_user }} jps | grep -q DataNode"
+  register: dn_running
+  failed_when: false
+  changed_when: false
+  when: inventory_hostname in groups['datanodes']
+
+- name: Restart DataNode to connect to HA nameservice
+  shell: |
+    sudo -u {{ hadoop_user }} {{ hadoop_home }}/bin/hdfs --daemon stop datanode
+    sleep 3
+    sudo -u {{ hadoop_user }} {{ hadoop_home }}/bin/hdfs --daemon start datanode
+  when: inventory_hostname in groups['datanodes']
+
+- name: Wait for DataNodes to start
+  wait_for:
+    port: 9866
+    host: 127.0.0.1
+    delay: 3
+    timeout: 30
+  when: inventory_hostname in groups['datanodes']
+
+- name: Display DataNode restarted
+  debug:
+    msg: "DataNode restarted on {{ inventory_hostname }} to connect to HA nameservice"
+  when: inventory_hostname in groups['datanodes']
+
+# =============================================
+# Final wait for HA to stabilize
+# =============================================
+
+- name: Wait for HA to stabilize
+  pause:
+    seconds: 15
+  run_once: true

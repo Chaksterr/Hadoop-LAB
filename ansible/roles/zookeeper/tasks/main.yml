@@ -1,0 +1,98 @@
+---
+# ZooKeeper Installation and Configuration (Version 3.8.5)
+
+- name: Check if ZooKeeper already extracted
+  stat:
+    path: "{{ zookeeper_home }}/bin/zkServer.sh"
+  register: zookeeper_extracted
+  tags: zookeeper
+
+- name: Extract ZooKeeper from shared folder
+  unarchive:
+    src: "/vagrant_shared/apache-zookeeper-{{ zookeeper_version }}-bin.tar.gz"
+    dest: "/home/hadoop/"
+    remote_src: yes
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_group }}"
+  when: not zookeeper_extracted.stat.exists
+  tags: zookeeper
+
+- name: Create symbolic link for zookeeper
+  file:
+    src: "/home/hadoop/apache-zookeeper-{{ zookeeper_version }}-bin"
+    dest: "{{ zookeeper_home }}"
+    state: link
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_group }}"
+  when: not zookeeper_extracted.stat.exists
+  tags: zookeeper
+
+- name: Set ownership of zookeeper directory
+  file:
+    path: "/home/hadoop/apache-zookeeper-{{ zookeeper_version }}-bin"
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_group }}"
+    recurse: yes
+  tags: zookeeper
+
+- name: Create ZooKeeper data directory
+  file:
+    path: "{{ zookeeper_data_dir }}"
+    state: directory
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_group }}"
+    mode: '0755'
+  tags: zookeeper
+
+- name: Deploy ZooKeeper configuration (zoo.cfg)
+  template:
+    src: zoo.cfg.j2
+    dest: "{{ zookeeper_home }}/conf/zoo.cfg"
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_group }}"
+    mode: '0644'
+  tags: zookeeper
+
+- name: Set ZooKeeper myid (server.1 = master)
+  copy:
+    content: "1"
+    dest: "{{ zookeeper_data_dir }}/myid"
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_group }}"
+    mode: '0644'
+  when: inventory_hostname == 'master'
+  tags: zookeeper
+
+- name: Set ZooKeeper myid (server.2 = standby)
+  copy:
+    content: "2"
+    dest: "{{ zookeeper_data_dir }}/myid"
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_group }}"
+    mode: '0644'
+  when: inventory_hostname == 'standby'
+  tags: zookeeper
+
+- name: Set ZooKeeper myid (server.3 = datanode1)
+  copy:
+    content: "3"
+    dest: "{{ zookeeper_data_dir }}/myid"
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_group }}"
+    mode: '0644'
+  when: inventory_hostname == 'datanode1'
+  tags: zookeeper
+
+- name: Set ZOOKEEPER_HOME in .bashrc
+  lineinfile:
+    path: "/home/{{ hadoop_user }}/.bashrc"
+    line: "export ZOOKEEPER_HOME={{ zookeeper_home }}"
+    state: present
+  tags: zookeeper
+
+- name: Add ZooKeeper to PATH
+  lineinfile:
+    path: "/home/{{ hadoop_user }}/.bashrc"
+    line: "export PATH=$PATH:{{ zookeeper_home }}/bin"
+    state: present
+  tags: zookeeper

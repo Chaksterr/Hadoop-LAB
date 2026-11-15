@@ -1,0 +1,25 @@
+---
+# Stop ZooKeeper servers
+
+- name: Check if ZooKeeper is running
+  shell: "sudo -u {{ hadoop_user }} {{ zookeeper_home }}/bin/zkServer.sh status 2>&1"
+  register: zk_running
+  failed_when: false
+  changed_when: false
+  when: inventory_hostname in groups['zookeepers']
+
+- name: Stop ZooKeeper
+  shell: "sudo -u {{ hadoop_user }} {{ zookeeper_home }}/bin/zkServer.sh stop"
+  when:
+    - inventory_hostname in groups['zookeepers']
+    - zk_running.rc == 0
+
+- name: Wait for ZooKeeper to stop
+  pause:
+    seconds: 3
+  when: inventory_hostname in groups['zookeepers']
+
+- name: Display ZooKeeper stopped
+  debug:
+    msg: "ZooKeeper stopped on {{ inventory_hostname }}"
+  when: inventory_hostname in groups['zookeepers']

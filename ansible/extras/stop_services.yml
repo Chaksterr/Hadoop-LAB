@@ -1,0 +1,9 @@
+---
+# Stop Hadoop services playbook
+# Usage: ansible-playbook -i inventory.ini extras/stop_services.yml
+
+- name: Stop all Hadoop services
+  hosts: all
+  become: yes
+  roles:
+    - stopping

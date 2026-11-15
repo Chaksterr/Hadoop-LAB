@@ -1,0 +1,82 @@
+---
+
+- name: Setup common components on all nodes
+  hosts: all
+  become: yes
+  roles:
+    - common
+
+- name: Setup Hadoop cluster
+  hosts: all
+  become: yes
+  roles:
+    - hadoop
+
+- name: Setup ZooKeeper on designated nodes
+  hosts: zookeepers
+  become: yes
+  roles:
+    - zookeeper
+
+- name: Setup JournalNode storage
+  hosts: journalnodes
+  become: yes
+  roles:
+    - journalnode
+
+- name: Start ZooKeeper ensemble FIRST
+  hosts: zookeepers
+  become: yes
+  tasks:
+    - name: Check if ZooKeeper is running
+      shell: "sudo -u {{ hadoop_user }} jps | grep -q QuorumPeerMain"
+      register: zk_running
+      failed_when: false
+      changed_when: false
+
+    - name: Start ZooKeeper
+      shell: "sudo -u {{ hadoop_user }} {{ zookeeper_home }}/bin/zkServer.sh start"
+      when: zk_running.rc != 0
+      
+    - name: Wait for ZooKeeper
+      wait_for:
+        host: 0.0.0.0
+        port: 2181
+        delay: 5
+        timeout: 60
+      when: zk_running.rc != 0
+
+    - name: Display ZooKeeper status
+      debug:
+        msg: "ZooKeeper already running on {{ inventory_hostname }}"
+      when: zk_running.rc == 0
+
+- name: Start JournalNodes
+  hosts: journalnodes
+  become: yes
+  roles:
+    - start_journalnodes
+
+- name: Format and start active NameNode
+  hosts: active_namenode
+  become: yes
+  roles:
+    - format_active_namenode
+
+- name: Bootstrap standby NameNode  
+  hosts: standby_namenode
+  become: yes
+  roles:
+    - bootstrap_standby_namenode
+
+- name: Initialize ZKFC in ZooKeeper
+  hosts: active_namenode
+  become: yes
+  roles:
+    - init_zkfc
+
+- name: Start all cluster services
+  hosts: all
+  become: yes
+  roles:
+    - initialization

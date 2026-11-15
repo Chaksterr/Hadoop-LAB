@@ -1,0 +1,40 @@
+---
+# Versions
+hadoop_version: "3.3.6"
+java_version: "11"
+zookeeper_version: "3.8.5"
+
+# Paths
+hadoop_home: "/home/hadoop/hadoop"
+hadoop_data_dir: "/home/hadoop/hadoop_data"
+zookeeper_home: "/home/hadoop/zookeeper"
+zookeeper_data_dir: "/home/hadoop/zookeeper_data"
+
+# User
+hadoop_user: "hadoop"
+hadoop_group: "hadoop"
+
+# HA Configuration 
+nameservice_id: "hadoopcluster"
+namenode1_id: "nn1"
+namenode2_id: "nn2"
+namenode1_host: "master"
+namenode2_host: "standby"
+namenode1_rpc_port: "8020"
+namenode2_rpc_port: "8020"
+namenode1_http_port: "9870"
+namenode2_http_port: "9870"
+
+# JournalNode Configuration 
+journalnode_edits_dir: "/home/hadoop/hadoop_data/journalnode"
+journalnode_rpc_port: "8485"
+journalnode_http_port: "8480"
+
+# ZooKeeper Configuration 
+zookeeper_client_port: "2181"
+zookeeper_peer_port: "2888"
+zookeeper_leader_port: "3888"
+zookeeper_admin_port: "8080"
+
+# YARN ResourceManager
+resourcemanager_host: "master"
