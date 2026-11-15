@@ -56,9 +56,13 @@ jps  # Should show: NameNode, ResourceManager, JobHistoryServer
 │   ├── inventory.ini           # Node definitions
 │   ├── group_vars/
 │   │   └── all.yml             # Configuration variables
-│   ├── common/                 # Java, users, SSH
-│   ├── hadoop/                 # Hadoop installation
-│   └── format_master/          # NameNode formatting
+│   └── roles/
+│       ├── common/             # Java, users, SSH
+│       ├── hadoop/             # Hadoop installation
+│       ├── format_master/      # NameNode formatting
+│       ├── initialization/     # Start services
+│       └── stopping/           # Stop services
+└── shared/                     # Shared files with VMs
 ```
 
 ---
@@ -147,7 +151,7 @@ namenode_host: "master"
 namenode_port: "9000"
 ```
 
-Configuration templates in `ansible/hadoop/templates/`:
+Configuration templates in `ansible/roles/hadoop/templates/`:
 - `core-site.xml.j2`
 - `hdfs-site.xml.j2`
 - `yarn-site.xml.j2`
