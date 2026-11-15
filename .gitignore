@@ -1,56 +1,86 @@
-# Vagrant
+# =============================================================================
+#  Hadoop Lab - .gitignore (same file on every branch)
+# =============================================================================
+
+# ---- SSH keys & certificates (never commit) ---------------------------------
+id_rsa*
+id_dsa*
+id_ecdsa*
+id_ed25519*
+*private_key*
+insecure_private_key
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.ppk
+known_hosts
+authorized_keys
+.ssh/
+
+# ---- Secrets & credentials --------------------------------------------------
+.env
+.env.*
+*.secret
+secrets/
+vault-password*
+.vault_pass*
+*.vault
+credentials*
+*.kdbx
+
+# ---- Vagrant (machine state: VM ids, local paths, generated keys) ----------
 .vagrant/
 *.box
 ubuntu-*-console.log
 
-# Ansible
+# ---- Ansible ----------------------------------------------------------------
 *.retry
 .ansible/
+ansible/fact_cache/
 
-# Logs
+# ---- Logs -------------------------------------------------------------------
 *.log
+logs/
 
-# OS Files
-.DS_Store
-Thumbs.db
-*~
-*.swp
-*.swo
-.*.swp
-.*.swo
+# ---- Big downloads (re-download from archive.apache.org) --------------------
+*.tar.gz
+*.tgz
+*.tar
+*.zip
+*.deb
+*.rpm
+*.jar
 
-# IDE / Editor
+# ---- Local data (too big / generated) ---------------------------------------
+/*.csv
+/*.parquet
+hadoop_data/
+data/
+output/
+
+# ---- Python / Jupyter -------------------------------------------------------
+__pycache__/
+*.pyc
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# ---- Java build output ------------------------------------------------------
+*.class
+target/
+
+# ---- Editors / OS -----------------------------------------------------------
 .vscode/
 .idea/
 *.iml
-*.sublime-project
-*.sublime-workspace
-.project
-.settings/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
 
-# Shared folder (local data)
-shared/
-
-# SSH Keys
-*.pem
-*.key
-id_rsa*
-private_key
-
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-
-# Environment
-.env
-.venv
-env/
-venv/
-
-# Temporary files
-tmp/
-temp/
-*.tmp
+# ---- Claude Code local files ------------------------------------------------
+.claude/settings.local.json
+.claude_*.sh
