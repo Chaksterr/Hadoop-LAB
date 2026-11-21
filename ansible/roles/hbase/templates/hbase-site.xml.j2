@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<!-- Genere par Ansible (roles/hbase) - ne pas modifier a la main -->
+<configuration>
+  <!-- Mode distribue : chaque service dans son propre processus, sur plusieurs machines -->
+  <property><name>hbase.cluster.distributed</name><value>true</value></property>
+
+  <!-- Emplacement des donnees HBase dans HDFS (ne pas changer : les tables existantes y sont) -->
+  <property><name>hbase.rootdir</name><value>{{ hbase_rootdir }}</value></property>
+
+  <!-- Quorum ZooKeeper externe (partage avec Hive) : elit le HMaster actif -->
+  <property><name>hbase.zookeeper.quorum</name><value>{{ groups['zookeepers'] | join(',') }}</value></property>
+  <property><name>hbase.zookeeper.property.clientPort</name><value>{{ zookeeper_client_port }}</value></property>
+
+  <!-- Detection de panne en 30 s au lieu de 90 s : bascule plus rapide -->
+  <property><name>zookeeper.session.timeout</name><value>{{ hbase_zk_session_timeout }}</value></property>
+
+  <property><name>hbase.tmp.dir</name><value>{{ hbase_tmp_dir }}</value></property>
+</configuration>

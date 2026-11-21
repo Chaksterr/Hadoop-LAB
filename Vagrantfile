@@ -5,7 +5,7 @@ Vagrant.configure("2") do |config|
 
   nodes = {
     "master"    => { ram: 4096, cpu: 3, ip: "192.168.56.10" },
-    "datanode1" => { ram: 2048, cpu: 2, ip: "192.168.56.12" },
+    "datanode1" => { ram: 3072, cpu: 2, ip: "192.168.56.12" },
     "datanode2" => { ram: 2048, cpu: 2, ip: "192.168.56.13" }
   }
 

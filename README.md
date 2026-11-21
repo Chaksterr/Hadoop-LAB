@@ -44,7 +44,7 @@ vagrant up                 # build it
 | **Distributed processing** | YARN scheduling MapReduce jobs (Java) and Spark jobs (PySpark) |
 | **High availability** | Active and standby NameNodes, a 3-node ZooKeeper quorum, JournalNodes and ZKFC for automatic failover |
 | **Data warehousing** | Hive with a MySQL metastore: SQL tables over HDFS files |
-| **NoSQL** | HBase with RegionServers on the datanodes for fast row-level read and write |
+| **NoSQL** | HBase in high availability: active + backup HMaster, RegionServers on the datanodes, shared 3-node ZooKeeper quorum |
 | **Operations** | Start and stop playbooks that respect service order (for example HBase stops before HDFS) |
 
 ---
@@ -69,10 +69,11 @@ If the active NameNode fails, ZooKeeper detects it and the standby takes over au
 
 **`hadoop-hive`: Hive + HBase**
 ```
-master     NameNode · ResourceManager · JobHistory · Hive · MySQL · HMaster · ZooKeeper
-datanode1  DataNode · NodeManager · RegionServer
-datanode2  DataNode · NodeManager · RegionServer
+master     NameNode · ResourceManager · JobHistory · Hive · MySQL · HMaster (active)  · ZooKeeper
+datanode1  DataNode · NodeManager · RegionServer · HMaster (backup)                  · ZooKeeper
+datanode2  DataNode · NodeManager · RegionServer                                     · ZooKeeper
 ```
+If the active HMaster fails, ZooKeeper detects it and the backup HMaster on datanode1 takes over.
 
 | Node | IP |
 |---|---|
@@ -165,7 +166,7 @@ scan 'users'
     ├── stop_cluster.yml     # stop all services
     ├── inventory.ini        # list of nodes
     ├── group_vars/all.yml   # versions, paths and passwords
-    └── roles/               # common · hadoop · format_master · mysql · hive
+    └── roles/               # common · hadoop · format_master · mysql · hive · zookeeper · hbase
 ```
 
 ---
@@ -175,6 +176,6 @@ scan 'users'
 - Passwords in `group_vars/all.yml` are for this lab only.
 - `hadoop-cluster` contains the PySpark exercises (`exercises/`, `shared/`), but its playbooks don't install Spark.
 - `hadoop-hive` uses Java 8; `hadoop-cluster` and `hadoop-ha` use Java 11.
-- HBase is installed by hand for now (see `cluster-commands.txt`). An Ansible role is planned.
+- HBase HA is installed by the `zookeeper` and `hbase` roles (`HBASE_MANAGES_ZK=false`: HBase uses the shared ZooKeeper quorum).
 - Don't use `stop-hbase.sh`: in HBase 2.5.12 it hangs. `stop_cluster.yml` handles HBase correctly.
 - Clean reinstall: `vagrant destroy -f && vagrant up`

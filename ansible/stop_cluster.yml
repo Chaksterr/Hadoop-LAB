@@ -7,6 +7,16 @@
 #   cd ansible
 #   ansible-playbook stop_cluster.yml
 
+- name: Make sure the ZooKeeper quorum is up (HBase needs it to shut down cleanly)
+  hosts: zookeepers
+  become: yes
+  become_user: "{{ hadoop_user }}"
+  tasks:
+    - name: Start ZooKeeper if needed
+      include_role:
+        name: zookeeper
+        tasks_from: start
+
 - name: Stop Hadoop cluster
   hosts: master
   become: yes
@@ -26,6 +36,8 @@
     # shutting down -> the master can't set the "cluster down" flag in ZK,
     # RegionServers never get the signal, and everything hangs.
     # So: ZK up -> ask cluster to shut down -> wait for exit -> THEN stop ZK.
+    # ZooKeeper is now an external quorum (roles/zookeeper): it is started
+    # by the first play and stopped by the last one, after Hive and HDFS.
     # ---------------------------------------------------------------------
     - name: Check whether HBase is installed
       stat:
@@ -38,14 +50,6 @@
       when: hbase_installed.stat.exists
       failed_when: false
       changed_when: false
-
-    - name: Make sure ZooKeeper is up (HBase needs it to shut down cleanly)
-      shell: "{{ hbase_home }}/bin/hbase-daemon.sh start zookeeper"
-      environment:
-        HBASE_HOME: "{{ hbase_home }}"
-      when: hbase_installed.stat.exists and hmaster_running.rc == 0
-      register: zk_start
-      changed_when: "'running zookeeper' in zk_start.stdout"
 
     - name: Ask HBase to shut down the cluster (RegionServers flush + exit, then HMaster)
       shell: "timeout 120 {{ hbase_home }}/bin/hbase master stop --shutDownCluster"
@@ -79,13 +83,6 @@
       when: hbase_installed.stat.exists and hbase_wait.rc | default(0) != 0
       ignore_errors: yes
 
-    - name: Stop ZooKeeper (last, after HMaster and RegionServers are gone)
-      shell: "{{ hbase_home }}/bin/hbase-daemon.sh stop zookeeper"
-      environment:
-        HBASE_HOME: "{{ hbase_home }}"
-      when: hbase_installed.stat.exists
-      ignore_errors: yes
-
     - name: Stop HiveServer2
       shell: "pkill -9 -f 'org.apache.hive.service.server.HiveServer2'"
       ignore_errors: yes
@@ -107,6 +104,16 @@
     - name: Stop HDFS (NameNode + DataNodes)
       shell: "{{ hadoop_home }}/sbin/stop-dfs.sh"
       ignore_errors: yes
+
+- name: Stop the ZooKeeper quorum (last, after HBase and Hive are gone)
+  hosts: zookeepers
+  become: yes
+  become_user: "{{ hadoop_user }}"
+  tasks:
+    - name: Stop ZooKeeper
+      include_role:
+        name: zookeeper
+        tasks_from: stop
 
 - name: Check all nodes are stopped
   hosts: hadoop_cluster

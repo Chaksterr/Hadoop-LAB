@@ -2,8 +2,9 @@ HADOOP-LAB - MANUAL COMMANDS
 Run on master as hadoop:  vagrant ssh master  ->  sudo -iu hadoop
 
 
-START  (HDFS -> YARN -> Hive -> HBase)
+START  (ZooKeeper -> HDFS -> YARN -> Hive -> HBase)
 -----
+0. for n in master datanode1 datanode2; do ssh $n '~/zookeeper/bin/zkServer.sh start'; done
 1. start-dfs.sh
 2. start-yarn.sh
 3. mapred --daemon start historyserver
@@ -14,24 +15,25 @@ START  (HDFS -> YARN -> Hive -> HBase)
 8. start-hbase.sh
 
 
-STOP  (HBase -> Hive -> YARN -> HDFS)
+STOP  (HBase -> Hive -> YARN -> HDFS -> ZooKeeper)
 ----
 1. hbase master stop --shutDownCluster      (not stop-hbase.sh, it hangs)
-2. jps                                      (repeat until HMaster is gone)
-3. hbase-daemon.sh stop zookeeper
+2. jps                                      (repeat until HMaster is gone, on master AND datanode1)
+3. (ZooKeeper is stopped last, see step 9)
 4. pkill -f 'org.apache.hive.service.server.HiveServer2'
 5. pkill -f 'hive.*metastore'
 6. mapred --daemon stop historyserver
 7. stop-yarn.sh
 8. stop-dfs.sh
+9. for n in master datanode1 datanode2; do ssh $n '~/zookeeper/bin/zkServer.sh stop'; done
 
 
 CHECK
 -----
-jps                                  master:   NameNode, ResourceManager, HMaster, HQuorumPeer ...
-ssh datanode1 jps                    datanode: DataNode, NodeManager, HRegionServer
+jps                                  master:    NameNode, ResourceManager, HMaster, QuorumPeerMain ...
+ssh datanode1 jps                    datanode1: DataNode, NodeManager, HRegionServer, HMaster (backup), QuorumPeerMain
 hdfs dfsadmin -safemode get          Safe mode is OFF
-echo status | hbase shell -n         1 active master, 2 servers
+echo status | hbase shell -n         1 active master, 1 backup masters, 2 servers
 
 
 WEB UIs

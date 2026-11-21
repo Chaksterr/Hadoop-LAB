@@ -1,0 +1,112 @@
+---
+# roles/hbase/tasks/main.yml
+# Installe HBase {{ hbase_version }} en haute disponibilite sur tous les noeuds :
+#   - HMaster actif     : master (lance start-hbase.sh)
+#   - HMaster de secours: hotes du groupe [hbase_backup_masters] (fichier backup-masters)
+#   - RegionServers     : hotes du groupe [datanodes]            (fichier regionservers)
+#   - ZooKeeper         : quorum externe du role zookeeper (HBASE_MANAGES_ZK=false)
+# Meme binaires et meme configuration partout : chaque noeud lit sa propre copie.
+
+- name: Download HBase {{ hbase_version }} tarball
+  get_url:
+    url: "{{ hbase_mirror }}"
+    dest: "/tmp/hbase-{{ hbase_version }}-hadoop3-bin.tar.gz"
+    timeout: 600
+  register: hbase_dl
+  retries: 3
+  delay: 10
+  until: hbase_dl is succeeded
+
+- name: Extract HBase
+  unarchive:
+    src: "/tmp/hbase-{{ hbase_version }}-hadoop3-bin.tar.gz"
+    dest: "{{ hadoop_install_dir }}"
+    remote_src: yes
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_user }}"
+    creates: "{{ hadoop_install_dir }}/hbase-{{ hbase_version }}-hadoop3"
+
+- name: Symlink hbase_home
+  file:
+    src: "{{ hadoop_install_dir }}/hbase-{{ hbase_version }}-hadoop3"
+    dest: "{{ hbase_home }}"
+    state: link
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_user }}"
+
+- name: Create HBase tmp and pid directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_user }}"
+    mode: "0755"
+  loop:
+    - "{{ hbase_tmp_dir }}"
+    - "{{ hbase_home }}/pids"
+
+# Sauvegarde unique de la configuration d'origine (avant la premiere modification).
+- name: Back up the original HBase conf directory (first run only)
+  command: "cp -r {{ hbase_home }}/conf {{ hbase_home }}/conf.bak"
+  args:
+    creates: "{{ hbase_home }}/conf.bak"
+  become_user: "{{ hadoop_user }}"
+
+- name: Set HBase environment in hbase-env.sh
+  lineinfile:
+    path: "{{ hbase_home }}/conf/hbase-env.sh"
+    regexp: "^#?\\s*export {{ item.name }}="
+    line: "export {{ item.name }}={{ item.value }}"
+  loop:
+    - { name: "JAVA_HOME", value: "{{ java_home }}" }
+    # false = HBase n'a pas son propre ZooKeeper : il utilise le quorum partage avec Hive
+    - { name: "HBASE_MANAGES_ZK", value: "false" }
+    - { name: "HBASE_DISABLE_HADOOP_CLASSPATH_LOOKUP", value: "true" }
+    - { name: "HBASE_MASTER_OPTS", value: "\"{{ hbase_master_heap }}\"" }
+    - { name: "HBASE_REGIONSERVER_OPTS", value: "\"{{ hbase_regionserver_heap }}\"" }
+    - { name: "HBASE_PID_DIR", value: "{{ hbase_home }}/pids" }
+
+- name: Deploy hbase-site.xml (quorum ZooKeeper de 3 noeuds)
+  template:
+    src: hbase-site.xml.j2
+    dest: "{{ hbase_home }}/conf/hbase-site.xml"
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_user }}"
+
+- name: Deploy regionservers
+  template:
+    src: regionservers.j2
+    dest: "{{ hbase_home }}/conf/regionservers"
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_user }}"
+
+# C'est ce fichier qui active la HA du HMaster.
+- name: Deploy backup-masters
+  template:
+    src: backup-masters.j2
+    dest: "{{ hbase_home }}/conf/backup-masters"
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_user }}"
+
+# HBase est un client HDFS : il doit lire la meme configuration que Hadoop.
+- name: Link Hadoop core-site.xml and hdfs-site.xml into HBase conf
+  file:
+    src: "{{ hadoop_home }}/etc/hadoop/{{ item }}"
+    dest: "{{ hbase_home }}/conf/{{ item }}"
+    state: link
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_user }}"
+    force: yes
+  loop:
+    - core-site.xml
+    - hdfs-site.xml
+
+- name: Add HBase environment variables to .bashrc
+  blockinfile:
+    path: "{{ hadoop_install_dir }}/.bashrc"
+    marker: "# {mark} HBASE ENV"
+    block: |
+      export HBASE_HOME={{ hbase_home }}
+      export PATH=$PATH:$HBASE_HOME/bin
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_user }}"

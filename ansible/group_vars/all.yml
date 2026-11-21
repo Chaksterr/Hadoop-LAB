@@ -38,3 +38,18 @@ hiveserver2_port: 10000
 # HBase configuration
 hbase_version: "2.5.12"
 hbase_home: "{{ hadoop_install_dir }}/hbase"
+
+# ZooKeeper (quorum de 3 noeuds, partage par Hive HA et HBase HA)
+zookeeper_version: "3.8.3"
+zookeeper_home: "{{ hadoop_install_dir }}/zookeeper"
+zookeeper_data_dir: "{{ zookeeper_home }}/data"
+zookeeper_mirror: "https://archive.apache.org/dist/zookeeper/zookeeper-{{ zookeeper_version }}/apache-zookeeper-{{ zookeeper_version }}-bin.tar.gz"
+zookeeper_client_port: 2181
+
+# HBase HA (HMaster actif sur master, HMaster de secours sur les hotes du groupe hbase_backup_masters)
+hbase_mirror: "https://archive.apache.org/dist/hbase/{{ hbase_version }}/hbase-{{ hbase_version }}-hadoop3-bin.tar.gz"
+hbase_rootdir: "hdfs://{{ namenode_host }}:{{ namenode_port }}/hbase"
+hbase_tmp_dir: "{{ hadoop_install_dir }}/tmp/hbase"
+hbase_zk_session_timeout: 30000
+hbase_master_heap: "-Xms512m -Xmx1g"
+hbase_regionserver_heap: "-Xms512m -Xmx768m"

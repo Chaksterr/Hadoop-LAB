@@ -1,0 +1,38 @@
+---
+# roles/zookeeper/tasks/start.yml
+# Demarre ZooKeeper sur l'hote courant, puis attend que le quorum soit forme.
+# Utilise par start_cluster.yml et stop_cluster.yml (include_role ... tasks_from: start).
+
+# Apres un redemarrage des VMs, l'ancien fichier PID reste sur le disque.
+# zkServer.sh croit alors que ZooKeeper tourne deja ("already running") et ne demarre rien.
+# On supprime donc le fichier PID s'il ne correspond pas a un ZooKeeper vivant.
+- name: Remove stale ZooKeeper PID file
+  shell: |
+    f={{ zookeeper_data_dir }}/zookeeper_server.pid
+    if [ -f "$f" ] && ! ps -p "$(cat "$f")" -o args= 2>/dev/null | grep -q QuorumPeerMain; then
+      rm -f "$f"; echo removed
+    fi
+  register: zk_pid
+  changed_when: "'removed' in zk_pid.stdout"
+
+- name: Start ZooKeeper
+  shell: "{{ zookeeper_home }}/bin/zkServer.sh start"
+  environment:
+    JAVA_HOME: "{{ java_home }}"
+  register: zk_start
+  changed_when: "'STARTED' in zk_start.stdout"
+
+# Un noeud ne repond "Mode: leader/follower" que lorsque la majorite du quorum est en ligne.
+- name: Wait for the ZooKeeper quorum (leader or follower)
+  shell: "{{ zookeeper_home }}/bin/zkServer.sh status 2>&1"
+  environment:
+    JAVA_HOME: "{{ java_home }}"
+  register: zk_status
+  until: "'Mode: leader' in zk_status.stdout or 'Mode: follower' in zk_status.stdout"
+  retries: 15
+  delay: 4
+  changed_when: false
+
+- name: Show ZooKeeper mode on {{ inventory_hostname }}
+  debug:
+    msg: "{{ inventory_hostname }}: {{ zk_status.stdout_lines | select('search', 'Mode') | list }}"

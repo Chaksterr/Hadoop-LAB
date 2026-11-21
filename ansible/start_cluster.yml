@@ -1,11 +1,22 @@
 ---
 # ansible/start_cluster.yml
+# Order: ZooKeeper quorum -> HDFS -> YARN -> Hive -> HBase HA
 # Run whenever you want to bring the cluster up (e.g. after `vagrant up`
 # on an already-provisioned cluster, or after `vagrant halt` + `vagrant up`).
 #
 # Usage:
 #   cd ansible
 #   ansible-playbook start_cluster.yml
+
+- name: Start the ZooKeeper quorum (needed by HBase HA and Hive HA)
+  hosts: zookeepers
+  become: yes
+  become_user: "{{ hadoop_user }}"
+  tasks:
+    - name: Start ZooKeeper and wait for the quorum
+      include_role:
+        name: zookeeper
+        tasks_from: start
 
 - name: Start Hadoop cluster
   hosts: master
@@ -67,7 +78,7 @@
       shell: "{{ hadoop_home }}/bin/hdfs dfsadmin -safemode wait"
       when: hbase_installed.stat.exists
 
-    - name: Start HBase (ZooKeeper + HMaster + RegionServers)
+    - name: Start HBase HA (HMaster actif + HMaster de secours + RegionServers)
       shell: "{{ hbase_home }}/bin/start-hbase.sh"
       environment:
         HBASE_HOME: "{{ hbase_home }}"
