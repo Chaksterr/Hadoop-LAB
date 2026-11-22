@@ -1,0 +1,67 @@
+---
+# ansible/start_kafka.yml
+# Demarre uniquement ce qu'il faut pour le TP de streaming Kafka :
+#   ZooKeeper (3 noeuds) -> 3 brokers Kafka -> topic INGTopic
+# HDFS, YARN, Hive et HBase ne sont pas necessaires (economie de RAM).
+#
+# Usage :
+#   cd ansible
+#   ansible-playbook -i inventory.ini start_kafka.yml
+# Puis, sur master (utilisateur hadoop) :
+#   jupyter notebook --ip=0.0.0.0 --port=8888 --no-browser --notebook-dir=~/notebooks
+
+- name: Start the ZooKeeper quorum
+  hosts: zookeepers
+  become: yes
+  become_user: "{{ hadoop_user }}"
+  tasks:
+    - name: Start ZooKeeper and wait for the quorum
+      include_role:
+        name: zookeeper
+        tasks_from: start
+
+- name: Start the Kafka brokers
+  hosts: kafka_brokers
+  become: yes
+  become_user: "{{ hadoop_user }}"
+  tasks:
+    - name: Start the broker
+      include_role:
+        name: kafka
+        tasks_from: start
+
+- name: Check the cluster and create the topic
+  hosts: masters
+  become: yes
+  become_user: "{{ hadoop_user }}"
+  environment:
+    JAVA_HOME: "{{ java_home }}"
+  tasks:
+    - name: Wait until all brokers are registered in ZooKeeper
+      shell: "{{ zookeeper_home }}/bin/zkCli.sh -server {{ inventory_hostname }}:{{ zookeeper_client_port }} ls {{ kafka_zk_chroot }}/brokers/ids 2>/dev/null | tail -1"
+      register: broker_ids
+      until: broker_ids.stdout.count(',') + 1 == groups['kafka_brokers'] | length
+      retries: 15
+      delay: 4
+      changed_when: false
+
+    - name: Create topic {{ kafka_topic }} (only if it does not exist)
+      shell: >
+        {{ kafka_home }}/bin/kafka-topics.sh --create --if-not-exists
+        --topic {{ kafka_topic }}
+        --partitions {{ kafka_topic_partitions }}
+        --replication-factor {{ kafka_topic_replication }}
+        --bootstrap-server {{ inventory_hostname }}:{{ kafka_port }}
+      register: topic_create
+      changed_when: "'Created topic' in topic_create.stdout"
+
+    - name: Describe topic {{ kafka_topic }}
+      shell: "{{ kafka_home }}/bin/kafka-topics.sh --describe --topic {{ kafka_topic }} --bootstrap-server {{ inventory_hostname }}:{{ kafka_port }}"
+      register: topic_describe
+      changed_when: false
+
+    - name: Show brokers and partitions
+      debug:
+        msg:
+          - "Brokers registered: {{ broker_ids.stdout }}"
+          - "{{ topic_describe.stdout_lines }}"

@@ -41,8 +41,22 @@
   roles:
     - hbase
 
+- name: Install Kafka brokers (ZooKeeper mode, shared quorum)
+  hosts: kafka_brokers
+  become: yes
+  roles:
+    - kafka
+
+- name: Install Jupyter and the INGTopic streaming notebook (master only)
+  hosts: masters
+  become: yes
+  roles:
+    - jupyter
+
 - import_playbook: start_cluster.yml
 
 # Cluster is now installed, configured, and formatted.
 # Start it (first time and every time after) with:
 #   ansible-playbook -i inventory.ini start_cluster.yml
+# Kafka streaming lab (only ZooKeeper + Kafka, no HDFS/HBase needed):
+#   ansible-playbook -i inventory.ini start_kafka.yml

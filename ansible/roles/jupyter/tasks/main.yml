@@ -1,0 +1,45 @@
+---
+# roles/jupyter/tasks/main.yml
+# Installe Jupyter Notebook et les bibliotheques du TP Kafka (kafka-python, matplotlib)
+# pour l'utilisateur hadoop, et depose le notebook du producer / consumer INGTopic.
+# Lancement : jupyter notebook --ip=0.0.0.0 --port={{ jupyter_port }} --no-browser
+# puis http://192.168.56.10:{{ jupyter_port }} depuis le PC hote.
+
+- name: Install pip
+  apt:
+    name: python3-pip
+    state: present
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Install Jupyter and the Kafka / plotting libraries (user hadoop)
+  become_user: "{{ hadoop_user }}"
+  pip:
+    name: "{{ jupyter_packages }}"
+    extra_args: --user
+    executable: pip3
+
+- name: Add ~/.local/bin (jupyter) to the hadoop user's PATH
+  blockinfile:
+    path: "{{ hadoop_install_dir }}/.bashrc"
+    marker: "# {mark} JUPYTER ENV"
+    block: |
+      export PATH=$PATH:$HOME/.local/bin
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_user }}"
+
+- name: Create the notebooks directory
+  file:
+    path: "{{ hadoop_install_dir }}/notebooks"
+    state: directory
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_user }}"
+    mode: "0755"
+
+- name: Copy the INGTopic producer / consumer notebook
+  copy:
+    src: kafka_ingtopic_stream.ipynb
+    dest: "{{ hadoop_install_dir }}/notebooks/kafka_ingtopic_stream.ipynb"
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_user }}"
+    force: no   # ne pas ecraser un notebook deja modifie

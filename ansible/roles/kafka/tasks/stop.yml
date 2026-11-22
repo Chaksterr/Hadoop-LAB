@@ -1,0 +1,20 @@
+---
+# roles/kafka/tasks/stop.yml
+# Arrete le broker Kafka de l'hote courant (avant ZooKeeper).
+
+- name: Stop Kafka broker
+  shell: "{{ kafka_home }}/bin/kafka-server-stop.sh"
+  environment:
+    JAVA_HOME: "{{ java_home }}"
+  register: kafka_stop
+  failed_when: false
+  changed_when: "'No kafka server to stop' not in kafka_stop.stdout"
+
+- name: Wait until the broker has exited
+  shell: "pgrep -f 'kafka\\.Kafka '"
+  register: kafka_alive
+  until: kafka_alive.rc != 0
+  retries: 20
+  delay: 3
+  failed_when: false
+  changed_when: false

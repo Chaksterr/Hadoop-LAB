@@ -28,6 +28,17 @@ STOP  (HBase -> Hive -> YARN -> HDFS -> ZooKeeper)
 9. for n in master datanode1 datanode2; do ssh $n '~/zookeeper/bin/zkServer.sh stop'; done
 
 
+KAFKA LAB  (ZooKeeper -> Kafka ; no HDFS/HBase needed)
+---------
+1. for n in master datanode1 datanode2; do ssh $n '~/zookeeper/bin/zkServer.sh start'; done
+2. for n in master datanode1 datanode2; do ssh $n 'export KAFKA_HEAP_OPTS="-Xmx512M -Xms512M"; ~/kafka/bin/kafka-server-start.sh -daemon ~/kafka/config/server.properties'; done
+3. ~/zookeeper/bin/zkCli.sh -server master:2181 ls /kafka/brokers/ids          (expect [1, 2, 3])
+4. ~/kafka/bin/kafka-topics.sh --create --if-not-exists --topic INGTopic --partitions 3 --replication-factor 2 --bootstrap-server master:9092
+5. ~/kafka/bin/kafka-topics.sh --describe --topic INGTopic --bootstrap-server master:9092
+6. jupyter notebook --ip=0.0.0.0 --port=8888 --no-browser --notebook-dir=~/notebooks   ->  http://192.168.56.10:8888
+STOP: for n in master datanode1 datanode2; do ssh $n '~/kafka/bin/kafka-server-stop.sh'; done
+      then stop ZooKeeper on the 3 nodes (zkServer.sh stop)
+
 CHECK
 -----
 jps                                  master:    NameNode, ResourceManager, HMaster, QuorumPeerMain ...
@@ -48,3 +59,5 @@ ANSIBLE  (from laptop, in ansible/)
 -------
 ansible-playbook -i inventory.ini start_cluster.yml
 ansible-playbook -i inventory.ini stop_cluster.yml
+ansible-playbook -i inventory.ini start_kafka.yml    (Kafka lab)
+ansible-playbook -i inventory.ini stop_kafka.yml     (Kafka lab)

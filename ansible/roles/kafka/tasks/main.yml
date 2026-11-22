@@ -1,0 +1,66 @@
+---
+# roles/kafka/tasks/main.yml
+# Installe Kafka {{ kafka_version }} (mode ZooKeeper) sur les hotes du groupe [kafka_brokers].
+# Chaque hote devient un broker : broker.id = position dans le groupe (master=1, datanode1=2, datanode2=3).
+# Kafka utilise le quorum ZooKeeper partage, sous le chemin {{ kafka_zk_chroot }}.
+
+- name: Download Kafka {{ kafka_version }} tarball
+  get_url:
+    url: "{{ kafka_mirror }}"
+    dest: "/tmp/kafka_{{ kafka_scala_version }}-{{ kafka_version }}.tgz"
+    timeout: 600
+  register: kafka_dl
+  retries: 3
+  delay: 10
+  until: kafka_dl is succeeded
+
+- name: Extract Kafka
+  unarchive:
+    src: "/tmp/kafka_{{ kafka_scala_version }}-{{ kafka_version }}.tgz"
+    dest: "{{ hadoop_install_dir }}"
+    remote_src: yes
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_user }}"
+    creates: "{{ hadoop_install_dir }}/kafka_{{ kafka_scala_version }}-{{ kafka_version }}"
+
+# Sur le cluster existant, ~/kafka est deja un vrai dossier (installe a la main) :
+# on ne cree le lien que s'il n'existe rien a cet endroit.
+- name: Check whether {{ kafka_home }} already exists
+  stat:
+    path: "{{ kafka_home }}"
+  register: kafka_home_stat
+
+- name: Symlink kafka_home
+  file:
+    src: "{{ hadoop_install_dir }}/kafka_{{ kafka_scala_version }}-{{ kafka_version }}"
+    dest: "{{ kafka_home }}"
+    state: link
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_user }}"
+  when: not kafka_home_stat.stat.exists
+
+- name: Create Kafka log (data) directory
+  file:
+    path: "{{ kafka_log_dir }}"
+    state: directory
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_user }}"
+    mode: "0755"
+
+- name: Deploy server.properties (broker.id {{ groups['kafka_brokers'].index(inventory_hostname) + 1 }})
+  template:
+    src: server.properties.j2
+    dest: "{{ kafka_home }}/config/server.properties"
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_user }}"
+
+- name: Add Kafka environment variables to .bashrc
+  blockinfile:
+    path: "{{ hadoop_install_dir }}/.bashrc"
+    marker: "# {mark} KAFKA ENV"
+    block: |
+      export KAFKA_HOME={{ kafka_home }}
+      export KAFKA_HEAP_OPTS="{{ kafka_heap_opts }}"
+      export PATH=$PATH:$KAFKA_HOME/bin
+    owner: "{{ hadoop_user }}"
+    group: "{{ hadoop_user }}"

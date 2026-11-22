@@ -53,3 +53,28 @@ hbase_tmp_dir: "{{ hadoop_install_dir }}/tmp/hbase"
 hbase_zk_session_timeout: 30000
 hbase_master_heap: "-Xms512m -Xmx1g"
 hbase_regionserver_heap: "-Xms512m -Xmx768m"
+
+# Kafka (3 brokers en mode ZooKeeper ; broker.id = ordre dans le groupe kafka_brokers)
+kafka_version: "3.9.2"
+kafka_scala_version: "2.13"
+kafka_home: "{{ hadoop_install_dir }}/kafka"
+kafka_mirror: "https://archive.apache.org/dist/kafka/{{ kafka_version }}/kafka_{{ kafka_scala_version }}-{{ kafka_version }}.tgz"
+kafka_port: 9092
+kafka_log_dir: "{{ hadoop_install_dir }}/kafka-logs"
+kafka_zk_chroot: "/kafka"
+kafka_heap_opts: "-Xmx512M -Xms512M"
+kafka_num_partitions: 3
+kafka_default_replication_factor: 2
+kafka_log_retention_hours: 168
+
+# Topic du TP de streaming
+kafka_topic: "INGTopic"
+kafka_topic_partitions: 3
+kafka_topic_replication: 2
+
+# Jupyter (sur master) pour le producer / consumer Python
+jupyter_port: 8888
+jupyter_packages:
+  - notebook
+  - kafka-python
+  - matplotlib

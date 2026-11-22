@@ -11,6 +11,8 @@ A big-data lab that runs on a laptop: Hadoop clusters on virtual machines, built
 ![HBase](https://img.shields.io/badge/HBase_2.5.12-BE160C?logo=apache&logoColor=white)
 ![Spark](https://img.shields.io/badge/PySpark-E25A1C?logo=apachespark&logoColor=white)
 ![ZooKeeper](https://img.shields.io/badge/ZooKeeper-3.8-6DB33F?logo=apache&logoColor=white)
+![Kafka](https://img.shields.io/badge/Kafka_3.9.2-231F20?logo=apachekafka&logoColor=white)
+![Jupyter](https://img.shields.io/badge/Jupyter-F37626?logo=jupyter&logoColor=white)
 ![MySQL](https://img.shields.io/badge/MySQL-4479A1?logo=mysql&logoColor=white)
 
 One command, `vagrant up`, creates the virtual machines, installs Java and Hadoop, configures every
@@ -45,6 +47,7 @@ vagrant up                 # build it
 | **High availability** | Active and standby NameNodes, a 3-node ZooKeeper quorum, JournalNodes and ZKFC for automatic failover |
 | **Data warehousing** | Hive with a MySQL metastore: SQL tables over HDFS files |
 | **NoSQL** | HBase in high availability: active + backup HMaster, RegionServers on the datanodes, shared 3-node ZooKeeper quorum |
+| **Streaming** | 3-node Kafka cluster (ZooKeeper mode), topic `INGTopic`, Python producer / consumer with a real-time chart in Jupyter |
 | **Operations** | Start and stop playbooks that respect service order (for example HBase stops before HDFS) |
 
 ---
@@ -73,6 +76,7 @@ master     NameNode · ResourceManager · JobHistory · Hive · MySQL · HMaster
 datanode1  DataNode · NodeManager · RegionServer · HMaster (backup)                  · ZooKeeper
 datanode2  DataNode · NodeManager · RegionServer                                     · ZooKeeper
 ```
+Kafka streaming lab (same 3 VMs): one Kafka broker per node (`broker.id` 1, 2, 3), Jupyter on master.
 If the active HMaster fails, ZooKeeper detects it and the backup HMaster on datanode1 takes over.
 
 | Node | IP |
@@ -166,7 +170,9 @@ scan 'users'
     ├── stop_cluster.yml     # stop all services
     ├── inventory.ini        # list of nodes
     ├── group_vars/all.yml   # versions, paths and passwords
-    └── roles/               # common · hadoop · format_master · mysql · hive · zookeeper · hbase
+    ├── start_kafka.yml      # Kafka lab: ZooKeeper → 3 brokers → topic INGTopic
+    ├── stop_kafka.yml       # Kafka lab: brokers → ZooKeeper
+    └── roles/               # common · hadoop · format_master · mysql · hive · zookeeper · hbase · kafka · jupyter
 ```
 
 ---
@@ -177,5 +183,7 @@ scan 'users'
 - `hadoop-cluster` contains the PySpark exercises (`exercises/`, `shared/`), but its playbooks don't install Spark.
 - `hadoop-hive` uses Java 8; `hadoop-cluster` and `hadoop-ha` use Java 11.
 - HBase HA is installed by the `zookeeper` and `hbase` roles (`HBASE_MANAGES_ZK=false`: HBase uses the shared ZooKeeper quorum).
+- Kafka 3.9.2 runs in ZooKeeper mode (the last line that supports it; Kafka 4.0 uses KRaft only). Its data lives under `/kafka` in the shared ZooKeeper quorum.
+- Jupyter: `jupyter notebook --ip=0.0.0.0 --port=8888 --no-browser --notebook-dir=~/notebooks`, then open `http://192.168.56.10:8888`. The notebook is `kafka_ingtopic_stream.ipynb`.
 - Don't use `stop-hbase.sh`: in HBase 2.5.12 it hangs. `stop_cluster.yml` handles HBase correctly.
 - Clean reinstall: `vagrant destroy -f && vagrant up`

@@ -1,0 +1,29 @@
+---
+# ansible/stop_kafka.yml
+# Arrete le TP de streaming : brokers Kafka d'abord, ZooKeeper ensuite
+# (un broker a besoin de ZooKeeper pour s'arreter proprement).
+# Arreter Jupyter avant (Ctrl+C dans son terminal).
+#
+# Usage :
+#   cd ansible
+#   ansible-playbook -i inventory.ini stop_kafka.yml
+
+- name: Stop the Kafka brokers
+  hosts: kafka_brokers
+  become: yes
+  become_user: "{{ hadoop_user }}"
+  tasks:
+    - name: Stop the broker
+      include_role:
+        name: kafka
+        tasks_from: stop
+
+- name: Stop the ZooKeeper quorum
+  hosts: zookeepers
+  become: yes
+  become_user: "{{ hadoop_user }}"
+  tasks:
+    - name: Stop ZooKeeper
+      include_role:
+        name: zookeeper
+        tasks_from: stop

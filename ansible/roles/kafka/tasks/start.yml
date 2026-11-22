@@ -1,0 +1,21 @@
+---
+# roles/kafka/tasks/start.yml
+# Demarre le broker Kafka de l'hote courant (le quorum ZooKeeper doit deja tourner).
+
+- name: Check whether a Kafka broker is already running
+  shell: "pgrep -f 'kafka\\.Kafka '"
+  register: kafka_running
+  failed_when: false
+  changed_when: false
+
+- name: Start Kafka broker
+  shell: "{{ kafka_home }}/bin/kafka-server-start.sh -daemon {{ kafka_home }}/config/server.properties"
+  environment:
+    JAVA_HOME: "{{ java_home }}"
+    KAFKA_HEAP_OPTS: "{{ kafka_heap_opts }}"
+  when: kafka_running.rc != 0
+
+- name: Wait for the broker to listen on port {{ kafka_port }}
+  wait_for:
+    port: "{{ kafka_port }}"
+    timeout: 60

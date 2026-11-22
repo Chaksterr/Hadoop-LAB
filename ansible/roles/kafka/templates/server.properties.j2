@@ -1,0 +1,29 @@
+# Genere par Ansible (roles/kafka) - ne pas modifier a la main
+
+# Identifiant unique du broker (master=1, datanode1=2, datanode2=3)
+broker.id={{ groups['kafka_brokers'].index(inventory_hostname) + 1 }}
+
+# Ecoute sur toutes les interfaces ; adresse donnee aux clients = nom de ce noeud
+listeners=PLAINTEXT://0.0.0.0:{{ kafka_port }}
+advertised.listeners=PLAINTEXT://{{ inventory_hostname }}:{{ kafka_port }}
+
+# Stockage des messages sur disque
+log.dirs={{ kafka_log_dir }}
+
+# Quorum ZooKeeper partage ; Kafka range ses donnees sous {{ kafka_zk_chroot }}
+zookeeper.connect={% for host in groups['zookeepers'] %}{{ host }}:{{ zookeeper_client_port }}{% if not loop.last %},{% endif %}{% endfor %}{{ kafka_zk_chroot }}
+
+zookeeper.connection.timeout.ms=18000
+
+# Valeurs par defaut des topics
+num.partitions={{ kafka_num_partitions }}
+default.replication.factor={{ kafka_default_replication_factor }}
+min.insync.replicas=1
+
+# Topics internes (positions des consumers, transactions)
+offsets.topic.replication.factor={{ [groups['kafka_brokers'] | length, 3] | min }}
+transaction.state.log.replication.factor={{ [groups['kafka_brokers'] | length, 3] | min }}
+transaction.state.log.min.isr={{ [groups['kafka_brokers'] | length, 2] | min }}
+
+# Conservation des messages
+log.retention.hours={{ kafka_log_retention_hours }}
